@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend SOP DB Verification"
+  short_description: "Verify backend SOP outcomes against a real database"
+  default_prompt: "Use $verify-backend-sop-db to validate this backend SOP through its real interface and database side effects."
