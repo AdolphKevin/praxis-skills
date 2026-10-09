@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: "Independent utility Skill for creating clean git commits from already staged changes. Use when the user asks to commit staged work, generate a commit message from git diff --cached, or run a scoped commit workflow. Not part of the CodeStable plan/do/review workflow."
+description: "Independent utility Skill for creating clean git commits from already staged changes. Use when the user asks to commit staged work, generate a commit message from git diff --cached, or run a scoped commit workflow."
 ---
 
 # Git Commit

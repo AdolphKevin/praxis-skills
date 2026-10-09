@@ -76,7 +76,7 @@ Locate:
 - `cmd/cli/scenario/**/*.yaml`
 - `cmd/cli/scenariorunner/`
 - `.agents/skills/scenario-trace-audit/SKILL.md`
-- `.codestable/attention.md` and current architecture/acceptance notes
+- current architecture and acceptance notes
 - `artifacts/**/trace.jsonl` and `run.meta.json`
 
 The current basic flow is shaped as:

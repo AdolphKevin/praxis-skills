@@ -1,6 +1,6 @@
 ---
 name: business-flow-mapper
-description: "Independent utility Skill for mapping a named business process from code, docs, traces, tests, or product context into a precise Chinese Mermaid flowchart and short explanation. Use when the user asks to 梳理业务处理流程, 画流程图, or explain how a business chain works. Not part of the CodeStable plan/do/review workflow."
+description: "Independent utility Skill for mapping a named business process from code, docs, traces, tests, or product context into a precise Chinese Mermaid flowchart and short explanation. Use when the user asks to 梳理业务处理流程, 画流程图, or explain how a business chain works."
 ---
 
 # Business Flow Mapper
