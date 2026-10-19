@@ -58,6 +58,9 @@
   "risk_checks": {
     "public-contract": [
       "unit"
+    ],
+    "cross-service": [
+      "unit"
     ]
   },
   "inputs": [],

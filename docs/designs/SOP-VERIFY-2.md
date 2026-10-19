@@ -10,7 +10,7 @@ roles: {"design_owner":"Claude","implementation_owner":"Codex","acceptance_owner
 
 > 本文件是 tw 任务 SOP-VERIFY-2 的方案原文。总体设计见 sop-board 仓库的 `docs/proposals/2026-10-19-standalone-sop-verification.md`（v8），本需求对应其第 8 节 SOP-VERIFY-2 一行，以及 D2、D3、D9、D16、D29 与第 4 节 S1、S2 中属于本需求的部分；看板接口以 sop-board 仓库的 `docs/designs/SOP-BOARD-1.md` 至 `SOP-BOARD-3.md` 为准。验收场景见 [docs/sop/sop-verify-2.yaml](../sop/sop-verify-2.yaml)。
 >
-> 状态：修订 2。修订 1 于 2026-10-20 经 AdolphKevin 授权由 Claude 代批；修订 2 按测试代理 sop-verify-2-tester 的 21 个待确认问题与 10 处出入补写，同日代批。
+> 状态：修订 2。修订 1 于 2026-10-20 经 AdolphKevin 授权由 Claude 代批；修订 2 按测试代理 sop-verify-2-tester 的 21 个待确认问题与 10 处出入补写，并按编写场景时发现的细节补充（推送的入口对象、批次冲突的核对时机、项目不存在时的待执行清单、pull 的取数），同日代批。
 
 ## 全局范围
 <!-- tw-section id=scope-global type=global-scope -->
@@ -39,17 +39,17 @@ roles: {"design_owner":"Claude","implementation_owner":"Codex","acceptance_owner
 看板模式下 `submit <场景文件> --results <结果文件> [--implementer <姓名>]`：
 
 1. 按 SOP-VERIFY-1 的规则在本机核对场景文件、入口与结果文件（错误代码不变）。
-2. 推送场景文件：`PUT …/batches/<批次>/scenario-file`，正文含 SOP-BOARD-1 I2 的字段（`project`、`path` 为仓内路径、`commit`、`dirty`、`product_digest` 按 SOP-VERIFY-1 D2、`content`、`fingerprints`、`pushed_by` 取 `git config user.name`，没有时取 `sop-verify`），以及 SOP-BOARD-3 I5 的 `entries`（所用入口声明的内容对象）与 `sop_sources`（与 SOP-BOARD-3 I5 相同的取法：场景文件 `metadata.sources` 每项 `ref` 按空白切分，去掉各段 `#` 及其后的锚点，取第一个指向仓库内已有文件的相对路径，读取工作区中的原文，附 HEAD 提交号、原文 sha256 与该项 `confirmed_by`；都没有时省略）。
+2. 推送场景文件：`PUT …/batches/<批次>/scenario-file`，正文含 SOP-BOARD-1 I2 的字段（`project`、`path` 为仓内路径、`commit`、`dirty`、`product_digest` 按 SOP-VERIFY-1 D2、`content`、`fingerprints`、`pushed_by` 取 `git config user.name`，没有时取 `sop-verify`），以及 SOP-BOARD-3 I5 的 `entries`（所用入口声明的内容对象：来自 `entries.yaml` 时为该文件解析后的整个对象；来自 `.tw/config.json` 时为 `{entries: <acceptance_entries>, checks: <checks>}`）与 `sop_sources`（与 SOP-BOARD-3 I5 相同的取法：场景文件 `metadata.sources` 每项 `ref` 按空白切分，去掉各段 `#` 及其后的锚点，取第一个指向仓库内已有文件的相对路径，读取工作区中的原文，附 HEAD 提交号、原文 sha256 与该项 `confirmed_by`；都没有时省略）。
 3. 逐个上传证据（`POST /api/v1/evidence`），按 sha256 去重。
 4. 登记轮次：`POST …/rounds`，`scenario_file_sha256` 为推送的场景文件原文 sha256，`idempotency_key` 为场景文件 sha256 与结果文件 sha256 两个十六进制字符串直接拼接后再取 sha256，`implementer` 取参数，`submitted_by` 同 `pushed_by`，`product` 为登记前计算的提交号、产品指纹与 `dirty`，每条结果带当前内容指纹与证据的 `{name, sha256}`。
 5. 推送前与登记轮次前各取一次场景文件 sha256 与产品指纹，期间变化时在登记前停止，错误代码 `source-stale`（同 SOP-VERIFY-1）；已推送的场景版本留在看板上，不登记轮次。
-6. `batch-conflict` 照旧按本机状态目录的 `batch.json` 核对，看板模式下本机仍写 `batch.json`。
+6. `batch-conflict` 照旧按本机状态目录的 `batch.json` 核对，在推送之前进行；看板模式下本机仍写 `batch.json`。
 
 成功输出看板返回的轮次号与统计、批次页面地址 `<SOP_BOARD_URL>/p/<项目键>/b/<批次>`，以及登记后的待执行清单（按 I3）。本机状态目录中不写轮次与证据。看板模式下 `import-cases` 把用例文件上传到看板（SOP-BOARD-2 I3，`uploaded_by` 同 `pushed_by`），输出看板返回的上传序号与并集条数，同时照旧保存本机快照供 `coverage` 核对；`coverage` 照旧在本机核对。
 
 ## 读取看板
 <!-- tw-section id=I3 type=interface depends=scope-global,I1 -->
-看板模式下 `pending <场景文件>` 读 `GET …/batches/<批次>/scenarios`，对本地场景文件的每条场景：看板当前版本中没有该编号时原因 `new`；指纹与看板不同时原因 `changed`；指纹相同时按看板给出的最新 Agent 结果与最新人工结果中轮次号较大的一条（"最新结果"）与队列：没有结果为 `new`；最新结果为 Agent `fail`、人工 `fail` 或人工 `blocked` 为 `failed`；在待执行队列而有过 Agent 通过为 `source-changed`。声明了 `regression.check` 的场景列为"由回归守护"并附看板上的检查结果（检查通过、检查待运行），检查失败的按 `failed` 进入清单；最新结果为 Agent `blocked` 或 `skip` 的列为"受阻"；这两类不进入清单。本机产品指纹与看板批次的最新产品指纹不同时附提示"本机有未推送的产品改动，看板的待执行判断基于已推送的版本"。批次在看板上不存在时，全部场景按 `new` 列出。输出格式与 SOP-VERIFY-1 相同，另附批次页面地址。
+看板模式下 `pending <场景文件>` 读 `GET …/batches/<批次>/scenarios`，对本地场景文件的每条场景：看板当前版本中没有该编号时原因 `new`；指纹与看板不同时原因 `changed`；指纹相同时按看板给出的最新 Agent 结果与最新人工结果中轮次号较大的一条（"最新结果"）与队列：没有结果为 `new`；最新结果为 Agent `fail`、人工 `fail` 或人工 `blocked` 为 `failed`；在待执行队列而有过 Agent 通过为 `source-changed`。声明了 `regression.check` 的场景，看板 `regression_status`（SOP-BOARD-4 I5）为 `failed` 时按 `failed` 进入清单，其余列为"由回归守护"并附"检查通过"或"检查待运行"（字段缺失按待运行）；最新结果为 Agent `blocked` 或 `skip` 的列为"受阻"；这两类不进入清单。`pending` 只发读取请求。项目或批次在看板上不存在时，全部场景按 `new` 列出。输出格式与 SOP-VERIFY-1 相同，另附批次页面地址。
 
 看板模式下 `report <场景文件>`：`--format markdown`（缺省）输出 `GET …/batches/<批次>/report.md` 的原文；`--format json` 输出 `{ok: true, batch: <GET …/batches/<批次> 的响应>}`。批次不存在时退出码 1，错误代码 `board-rejected`。
 
@@ -59,7 +59,7 @@ roles: {"design_owner":"Claude","implementation_owner":"Codex","acceptance_owner
 
 - 没有这样的任务时退出码 1，错误代码 `merge-not-found`。
 - 该任务依据的场景版本原文 sha256 与本地场景文件的 sha256 不同（本地文件不存在时视为依据为空），且本地文件也不等于合并结果时，退出码 1，错误代码 `pull-conflict`，问题写明本地修改需先 `submit` 推送后由看板重新合并；不写任何文件。
-- 否则把 `GET …/merges/<任务编号>/scenario-file` 的原文写入场景文件（已相同时不改写）；给出 `--pairs` 时把 `pairs.json` 写到该路径。输出写入的文件、合并任务编号与对应关系条数。写入后的场景文件可直接 `check`。
+- 否则把 `GET …/merges/<任务编号>/scenario-file` 的原文写入场景文件（已相同时不改写）；给出 `--pairs` 时把 `pairs.json` 写到该路径。输出写入的文件、合并任务编号与对应关系条数（条数取自 `…/merges/<任务编号>/pairs.json`；"最新"指任务编号最大）。写入后的场景文件可直接 `check`。
 
 ## 入口与检查声明
 <!-- tw-section id=D1 type=data depends=scope-global -->
