@@ -120,18 +120,18 @@ JSON Lines 文件至少填写一条结果，每行一个对象，同一文件每
 | `scenario` | 场景文件中的编号 |
 | `status` | `pass`、`fail`、`blocked` 或 `skip` |
 | `actual` | 实际观察到的结果，非空字符串 |
-| `evidence` | 相对结果文件目录的文件路径数组；文件实际位于该目录内，单个文件最多 64 MiB；`pass`、`fail` 至少一项 |
+| `evidence` | 逐个列出相对结果文件目录的普通文件路径；文件实际位于该目录内，单个文件最多 64 MiB；目录中的证据逐个列文件；`pass`、`fail` 至少一项 |
 | `executed_at` | 执行时间，带时区且不晚于当前时间的 ISO 8601 字符串 |
-| `executor` | 执行会话标识，非空字符串 |
-| `session` | 可选，会话标识补充 |
+| `executor` | 执行会话标识，取值按[会话标识](drivers.md#会话标识) |
+| `session` | 脚本格式可选；本技能执行时填写，取值按[会话标识](drivers.md#会话标识) |
 | `finding` | `blocked`、`skip` 必填非空问题说明；其他状态可选 |
 | `note` | 可选，补充说明 |
 
 结果对象采用表中字段。将结果文件与证据保存在仓库外的同一结果目录，命令参数使用该文件的绝对路径；`evidence` 字段保持相对路径。下面演示文件结构，执行时将时间、身份、实际结果与证据替换为本轮事实：
 
 ```jsonl
-{"scenario":"N1-P01","status":"pass","actual":"返回成功，核对到一笔退款记录","evidence":["cli-positive.txt"],"executed_at":"2020-01-01T12:00:00+08:00","executor":"session-demo-01"}
-{"scenario":"N1-N01","status":"pass","actual":"返回订单编号必填，退款记录数量保持不变","evidence":["cli-negative.txt"],"executed_at":"2020-01-01T12:00:01+08:00","executor":"session-demo-01"}
+{"scenario":"N1-P01","status":"pass","actual":"返回成功，核对到一笔退款记录","evidence":["cli-positive.txt"],"executed_at":"2020-01-01T12:00:00+08:00","executor":"ClaudeCode-20200101T120000+0800-退款验收","session":"ClaudeCode-20200101T120000+0800-退款验收"}
+{"scenario":"N1-N01","status":"pass","actual":"返回订单编号必填，退款记录数量保持不变","evidence":["cli-negative.txt"],"executed_at":"2020-01-01T12:00:01+08:00","executor":"ClaudeCode-20200101T120000+0800-退款验收","session":"ClaudeCode-20200101T120000+0800-退款验收"}
 ```
 
 ## 测试同事的用例文件
@@ -165,7 +165,7 @@ test_cases:
 | `conflict` | 与 `covered` 相同，`note` 写语义冲突 |
 | `disposed` | `case`、`state`（`blocked`、`deferred`、`out-of-scope`）、非空 `reason`、非空 `confirmed_by` |
 
-`scenarios` 引用当前场景文件的编号。冲突、遗漏、重复归类和不存在的引用会分别列出编号。下例假定业务负责人已确认本批次只覆盖人民币退款：
+`scenarios` 引用当前场景文件的编号。冲突、遗漏、重复归类和不存在的引用会分别列出编号。配对语义校验用 JSON 路径定位问题，例如 `covered[0].scenarios[1]`，`line` 为 `null`；`$` 表示整个配对对象。下例假定业务负责人已确认本批次只覆盖人民币退款：
 
 ```json
 {

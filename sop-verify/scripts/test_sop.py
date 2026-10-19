@@ -173,6 +173,34 @@ class SopTests(unittest.TestCase):
         self.assertEqual('entries-invalid', result['error_code'])
         self.assertTrue(result['problems'][0]['line'])
 
+    def test_entries_missing_lists_attempted_sources(self):
+        """W8: missing defaults identify both source kinds and absolute paths."""
+        self.entries.unlink()
+        result = self.run_cli('check', self.scenario, code=1)
+        self.assertEqual('entries-invalid', result['error_code'])
+        self.assertTrue(all(item['line'] is None for item in result['problems']))
+        message = '\n'.join(item['problem'] for item in result['problems'])
+        for value in (str(self.entries), str(self.repo / '.tw/config.json'),
+                      '场景同目录', 'acceptance_entries', '--entries'):
+            self.assertIn(value, message)
+        output = self.run_cli('check', self.scenario, code=1, fmt='text')
+        self.assertIn(message, output)
+        self.assertNotIn('[Errno', output)
+
+    def test_entries_missing_explicit_source_is_identified(self):
+        """W8: an explicit missing file is named as --entries without fallback."""
+        missing = self.base / 'missing-entries.yaml'
+        result = self.run_cli('check', self.scenario, '--entries', missing, code=1)
+        self.assertEqual('entries-invalid', result['error_code'])
+        self.assertEqual(1, len(result['problems']))
+        self.assertIsNone(result['problems'][0]['line'])
+        message = result['problems'][0]['problem']
+        self.assertIn('--entries', message)
+        self.assertIn(str(missing), message)
+        self.assertNotIn(str(self.entries), message)
+        self.assertNotIn('[Errno', message)
+        self.run_cli('check', self.scenario, readonly=True)
+
     def yaml_fixture(self):
         return """# 中文注释
 metadata:
@@ -820,6 +848,46 @@ test_cases:
                 result = self.run_cli('coverage', self.scenario, '--pairs', path, code=1, writes_on_error=True)
                 self.assertEqual('scenario-coverage-incomplete', result['error_code'])
 
+    def test_coverage_json_reference_errors_use_json_paths(self):
+        """W4: JSON array indexes are paths, never fabricated file line numbers."""
+        pairs = self.import_four()
+        pairs['covered'][0]['scenarios'] = ['N1-P', 'SOP-99-P01']
+        path = self.base / 'pairs.json'
+        pretty = json.dumps(pairs, indent=2, ensure_ascii=False)
+        original_line = next(i for i, line in enumerate(pretty.splitlines(), 1) if 'SOP-99-P01' in line)
+        pretty = '\n' * (13 - original_line) + pretty
+        self.assertEqual(13, next(i for i, line in enumerate(pretty.splitlines(), 1) if 'SOP-99-P01' in line))
+        for content in (pretty, json.dumps(pairs)):
+            with self.subTest(multiline='\n' in content):
+                path.write_text(content, encoding='utf-8')
+                result = self.run_cli('coverage', self.scenario, '--pairs', path, code=1, writes_on_error=True)
+                self.assertEqual('scenario-coverage-incomplete', result['error_code'])
+                self.assertEqual(1, len(result['problems']))
+                item = result['problems'][0]
+                self.assertIsNone(item['line'])
+                self.assertIn('covered[0].scenarios[1]', item['problem'])
+                self.assertIn('TC1', item['problem'])
+                self.assertIn('SOP-99-P01', item['problem'])
+                output = self.run_cli('coverage', self.scenario, '--pairs', path,
+                                      code=1, fmt='text', writes_on_error=True)
+                self.assertIn('covered[0].scenarios[1]', output)
+                self.assertNotIn('第 1 行', output)
+
+    def test_coverage_json_shape_errors_use_json_paths(self):
+        """W4: root, object and field errors each identify their JSON location."""
+        pairs = self.import_four()
+        path = self.base / 'pairs.json'
+        for change, expected in ((dict(covered='wrong'), 'covered'),
+                                 (dict(covered=[None]), 'covered[0]'),
+                                 (dict(covered=[dict(case='TC1', scenarios=['N1-P'])]), 'covered[0].note'),
+                                 (dict(disposed=[dict(case='TC4', state='wrong', reason='scope',
+                                                     confirmed_by='owner')]), 'disposed[0].state')):
+            with self.subTest(expected=expected):
+                self.write_json(path, dict(pairs, **change))
+                result = self.run_cli('coverage', self.scenario, '--pairs', path, code=1, writes_on_error=True)
+                self.assertTrue(all(item['line'] is None for item in result['problems']))
+                self.assertTrue(any(item['problem'].startswith(expected + '：') for item in result['problems']))
+
     def test_report_without_rounds(self):
         """D2; SOP-05-N01: null rate, explicitly no execution records."""
         result = self.run_cli('report', self.scenario, readonly=True)
@@ -828,6 +896,7 @@ test_cases:
         self.assertEqual([], result['rounds'])
         output = self.run_cli('report', self.scenario, fmt=None, readonly=True)
         self.assertIn('尚无执行记录', output)
+        self.assertIn('尚无执行记录。\n\n| 轮次 |', output)
         self.assertIn('无数据', output)
         self.assertNotIn('0%', output)
 

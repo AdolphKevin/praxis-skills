@@ -72,7 +72,7 @@ def markdown(report):
     lines += table(['编号', '极性', '当前状态', '最新结果', '执行者', '独立性', '实际结果', '证据与指纹前12位', 'finding'], values)
     lines += ['', '## 轮次表', '']
     if not report['rounds']:
-        lines += ['尚无执行记录。']
+        lines += ['尚无执行记录。', '']
     lines += table(['轮次', '执行数', 'pass', 'fail', 'blocked', 'skip', '通过率'],
                    [[row['round'], row['statistics']['executed'],
                      *[row['statistics'][s] for s in ('pass', 'fail', 'blocked', 'skip')],

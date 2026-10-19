@@ -73,6 +73,19 @@ class Validator:
             raise Invalid(code, self.problems)
 
 
+class JsonValidator(Validator):
+    """JSON decoded without source marks is located by path, not guessed line."""
+    def __init__(self):
+        super().__init__()
+        self.path = ''
+
+    def add(self, value, key, message):
+        location = self.path
+        if key is not None:
+            location += ('.' if location else '') + str(key)
+        self.problems.append(problem(f'{location or "$"}：{message}'))
+
+
 ENTRY_FIELDS = {'surface', 'operate', 'observe', 'evidence', 'isolation', 'address_env'}
 NEGATIVE_TYPES = set('empty-input over-length not-found permission cross-tenant duplicate '
                      'concurrency disconnect timeout archived invalid-input incomplete-input '
@@ -107,6 +120,13 @@ def resolve_entries(root, scenario, explicit=None):
     selected = Path(explicit) if explicit else sibling if sibling.exists() else config
     if not selected.is_absolute():
         selected = root / selected
+    if not selected.exists():
+        if explicit:
+            message = f'--entries 指定的入口文件不存在：{selected}'
+        else:
+            message = (f'未找到入口声明；未指定 --entries，已查找场景同目录的 entries.yaml：{sibling}；'
+                       f'仓库 .tw/config.json 的 acceptance_entries：{config}')
+        raise Invalid('entries-invalid', [problem(message)])
     doc = load_document(selected, 'entries-invalid')
     warnings = []
     if selected == config:
@@ -319,17 +339,19 @@ def validate_cases(doc):
 
 
 def evaluate_coverage(pairs, cases, scenario_ids):
-    v = Validator()
+    v = JsonValidator()
     case_ids = {item['id'] for item in cases}
     occurrences = {ident: 0 for ident in case_ids}
     conflicts = set()
     if v.fields(pairs, {'covered', 'conflict', 'disposed'}, set(), '配对文件'):
         for category in ('covered', 'conflict', 'disposed'):
+            v.path = ''
             values = pairs.get(category)
             if not isinstance(values, list):
                 v.add(pairs, category, f'{category} 必须是数组')
                 continue
-            for item in values:
+            for index, item in enumerate(values):
+                v.path = f'{category}[{index}]'
                 fields = {'case', 'state', 'reason', 'confirmed_by'} if category == 'disposed' else {'case', 'scenarios', 'note'}
                 if not v.fields(item, fields, set(), category):
                     continue
@@ -351,14 +373,14 @@ def evaluate_coverage(pairs, cases, scenario_ids):
                     if not isinstance(item.get('note'), str):
                         v.add(item, 'note', f'{ident} 的 note 必须是字符串')
                     if isinstance(item.get('scenarios'), list):
-                        for scenario in item['scenarios']:
+                        for scenario_index, scenario in enumerate(item['scenarios']):
                             if not isinstance(scenario, str) or scenario not in scenario_ids:
-                                v.add(item, 'scenarios', f'用例 {ident} 引用不存在的场景 {scenario}')
+                                v.add(item, f'scenarios[{scenario_index}]', f'用例 {ident} 引用不存在的场景 {scenario}')
     missing = sorted(ident for ident, count in occurrences.items() if not count)
     duplicate = sorted(ident for ident, count in occurrences.items() if count > 1)
     for label, identifiers in [('遗漏', missing), ('重复归类', duplicate), ('冲突', sorted(conflicts))]:
         for ident in identifiers:
-            v.problems.append(problem(f'{label}: {ident}'))
+            v.problems.append(problem(f'$：{label}: {ident}'))
     complete = not v.problems
     result = dict(ok=complete, complete=complete, total=len(case_ids), missing=missing,
                   duplicate=duplicate, conflict=sorted(conflicts))
