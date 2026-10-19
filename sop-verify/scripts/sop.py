@@ -6,12 +6,11 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
-import subprocess
 import sys
 
 sys.dont_write_bytecode = True
 
-from _state import State, product, now
+from _state import State, product, now, repository_root
 from _report import build_report, markdown, rate_text
 from _contracts import (
     Invalid, problem, load_document, resolve_entries, validate_scenarios,
@@ -81,11 +80,7 @@ def main():
                              help='输出格式；report 默认 markdown，其他命令默认 text')
     args = parser.parse_args()
     try:
-        process = subprocess.run(['git', '--no-optional-locks', '-C', args.root or '.', 'rev-parse', '--show-toplevel'],
-                                 capture_output=True, text=True)
-        if process.returncode:
-            raise Invalid('not-a-git-repository', [problem('不在 Git 仓库中')])
-        root = Path(process.stdout.strip()).resolve()
+        root = repository_root(args.root or '.')
         path = (root / args.scenario).resolve()
         if not path.is_relative_to(root):
             raise Invalid('scenario-file-invalid', [problem('场景文件必须在仓库内')])
@@ -135,8 +130,6 @@ def main():
                                       result['scenario_sha256'], entry_path)
                 result.update(round=record['round'], statistics=record['statistics'])
             result.update(state.pending(scenarios, result['fingerprints'], source))
-    except (OSError, ValueError) as error:
-        result = dict(ok=False, error_code='source-stale', problems=[problem(str(error))])
     except Invalid as error:
         result = dict(ok=False, error_code=error.code, problems=error.problems)
     if args.command == 'report' and args.format != 'json' and result['ok']:

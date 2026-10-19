@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -48,7 +49,7 @@ class SopTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='sop-cli-')
         self.addCleanup(self.temp.cleanup)
-        self.base = Path(self.temp.name)
+        self.base = Path(self.temp.name).resolve()
         self.repo = self.base / 'repo'
         self.repo.mkdir()
         subprocess.run(['git', 'init', '-q', str(self.repo)], check=True)
@@ -76,18 +77,32 @@ class SopTests(unittest.TestCase):
         self.write_json(self.scenario, self.doc)
 
     def files(self, root):
-        return {str(p.relative_to(root)): p.read_bytes()
-                for p in root.rglob('*') if p.is_file()}
+        files = {}
+        for path in root.rglob('*'):
+            if path.is_file():
+                try:
+                    files[str(path.relative_to(root))] = path.read_bytes()
+                except PermissionError:
+                    files[str(path.relative_to(root))] = ('unreadable', path.stat().st_mode)
+        return files
 
-    def run_cli(self, *args, code=0, fmt='json', cwd=None, readonly=False, writes_on_error=False):
+    def run_cli(self, *args, code=0, fmt='json', cwd=None, readonly=False, writes_on_error=False,
+                file_size_limit=None):
         before = self.files(self.repo)
         state_root = Path(self.env.get('SOP_VERIFY_STATE', str(self.state)))
         state = self.files(state_root)
         command = [sys.executable, str(SCRIPT), *map(str, args)]
         if fmt:
             command += ['--format', fmt]
+        def apply_limit():
+            import resource
+            import signal
+            signal.signal(signal.SIGXFSZ, signal.SIG_IGN)
+            resource.setrlimit(resource.RLIMIT_FSIZE, (file_size_limit, file_size_limit))
+
         result = subprocess.run(command, cwd=cwd or self.repo, env=self.env,
-                                capture_output=True, text=True, timeout=20)
+                                capture_output=True, text=True, timeout=20,
+                                preexec_fn=apply_limit if file_size_limit is not None else None)
         self.assertEqual(code, result.returncode,
                          f'{command}\n{result.stdout}\n{result.stderr}')
         self.assertEqual(before, self.files(self.repo), 'CLI changed repository files')
@@ -447,8 +462,225 @@ sops:
         self.assertEqual('batch-conflict', result['error_code'])
         self.env['SOP_VERIFY_STATE'] = str(self.repo / 'state')
         result = self.run_cli('submit', self.scenario, '--results', path, code=1)
-        self.assertEqual('source-stale', result['error_code'])
+        self.assertEqual('state-invalid', result['error_code'])
         self.assertFalse((self.repo / 'state').exists())
+
+    def assert_state_invalid(self, result, path):
+        self.assertFalse(result['ok'])
+        self.assertEqual('state-invalid', result['error_code'])
+        self.assertTrue(result['problems'])
+        self.assertTrue(all(p['line'] is None for p in result['problems']))
+        self.assertIn(str(path), str(result['problems']))
+        self.assertTrue(all(p['problem'].replace(str(path), '').strip(' :：')
+                            for p in result['problems']))
+
+    def test_state_invalid_paths_and_symlinks_before_writes(self):
+        """W3/I1; SOP-03-N03: invalid state paths never receive a round."""
+        results = self.results_file()
+        real = self.base / 'real-state'
+        real.mkdir()
+        link = self.base / 'state-link'
+        link.symlink_to(real, target_is_directory=True)
+        regular = self.base / 'state-file'
+        regular.write_text('not a directory')
+        for path in (self.repo / '.state', link, regular):
+            with self.subTest(path=path.name):
+                self.env['SOP_VERIFY_STATE'] = str(path)
+                before = self.files(self.base)
+                result = self.run_cli('submit', self.scenario, '--results', results, code=1)
+                self.assert_state_invalid(result, path)
+                self.assertEqual(before, self.files(self.base))
+        self.env['SOP_VERIFY_STATE'] = str(self.state)
+        self.state.mkdir()
+        child = self.state / 'linked-record'
+        child.symlink_to(real, target_is_directory=True)
+        result = self.run_cli('submit', self.scenario, '--results', results, code=1)
+        self.assert_state_invalid(result, child)
+
+    def test_state_invalid_directory_permissions_before_writes(self):
+        """W3/I1; SOP-03-N03: read-only state is rejected without a write probe."""
+        results = self.results_file()
+        self.state.mkdir()
+        (self.state / 'sentinel').write_text('unchanged')
+        before = self.files(self.state)
+        self.state.chmod(0o500)
+        try:
+            result = self.run_cli('submit', self.scenario, '--results', results, code=1)
+            self.assert_state_invalid(result, self.state)
+            self.assertEqual(0o500, self.state.stat().st_mode & 0o777)
+        finally:
+            self.state.chmod(0o700)
+        self.assertEqual(before, self.files(self.state))
+
+    def test_state_invalid_record_read_and_write_permissions(self):
+        """W3: inaccessible existing records leave every stored byte unchanged."""
+        results = self.results_file()
+        self.run_cli('submit', self.scenario, '--results', results)
+        targets = [(self.batch_path() / 'rounds/1/round.json', 0o000),
+                   (self.batch_path() / 'batch.json', 0o444)]
+        for path, mode in targets:
+            with self.subTest(path=path.name, mode=mode):
+                before = self.files(self.state)
+                previous = path.stat().st_mode & 0o777
+                path.chmod(mode)
+                try:
+                    result = self.run_cli('submit', self.scenario, '--results', results, code=1)
+                    self.assert_state_invalid(result, path)
+                    self.assertEqual(mode, path.stat().st_mode & 0o777)
+                finally:
+                    path.chmod(previous)
+                self.assertEqual(before, self.files(self.state))
+
+    def test_state_invalid_unparseable_and_malformed_records(self):
+        """W3: corrupt state is rejected on read and before all mutations."""
+        results = self.results_file()
+        self.run_cli('submit', self.scenario, '--results', results)
+        cases = self.write_json(self.base / 'cases.json', {'cases': [dict(id='TC', title='case')]})
+        pairs = self.write_json(self.base / 'pairs.json',
+                                dict(covered=[dict(case='TC', scenarios=['N1-P'], note='match')],
+                                     conflict=[], disposed=[]))
+        targets = [self.batch_path() / name for name in
+                   ('batch.json', 'rounds/1/round.json', 'cases/union.json',
+                    'cases/imports/000001.json', 'coverage/000001.json')]
+        self.run_cli('import-cases', self.scenario, cases)
+        self.run_cli('coverage', self.scenario, '--pairs', pairs)
+        for path in targets:
+            original = path.read_bytes()
+            for payload in (b'{', b'\xff'):
+                with self.subTest(path=path.relative_to(self.batch_path()), payload=payload):
+                    path.write_bytes(payload)
+                    before = self.files(self.state)
+                    for command in [('pending', self.scenario), ('report', self.scenario),
+                                    ('submit', self.scenario, '--results', results),
+                                    ('import-cases', self.scenario, cases),
+                                    ('coverage', self.scenario, '--pairs', pairs)]:
+                        result = self.run_cli(*command, code=1)
+                        self.assert_state_invalid(result, path)
+                    self.assertEqual(before, self.files(self.state))
+            path.write_bytes(original)
+        for name, value in [('batch.json', []), ('rounds/1/round.json', {}),
+                            ('cases/union.json', {'test_cases': [None]})]:
+            path = self.batch_path() / name
+            original = path.read_bytes()
+            with self.subTest(malformed=name):
+                self.write_json(path, value)
+                result = self.run_cli('submit' if name != 'cases/union.json' else 'import-cases',
+                                      self.scenario, *(['--results', results] if name != 'cases/union.json'
+                                                       else [cases]), code=1)
+                self.assert_state_invalid(result, path)
+            path.write_bytes(original)
+
+    def test_state_evidence_bytes_are_not_parsed_as_records(self):
+        """W3/D1: evidence remains arbitrary bytes even with a .json filename."""
+        path = self.results_file()
+        evidence = path.parent / 'evidence.json'
+        evidence.write_bytes(b'\xffnot-json')
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        for row in rows:
+            row['evidence'] = ['evidence.json']
+        path.write_text(''.join(json.dumps(row) + '\n' for row in rows))
+        self.run_cli('submit', self.scenario, '--results', path)
+        self.assertEqual([], self.run_cli('pending', self.scenario, readonly=True)['pending'])
+        record_path = self.batch_path() / 'rounds/1/round.json'
+        record = json.loads(record_path.read_text())
+        for row in record['results']:
+            self.assertEqual(evidence.read_bytes(),
+                             (record_path.parent / row['evidence'][0]['path']).read_bytes())
+
+    def test_unclassified_value_error_propagates_from_cli(self):
+        """W3: an unexpected Python audit-hook error must retain its traceback."""
+        hooks = self.base / 'hooks'
+        hooks.mkdir()
+        (hooks / 'sitecustomize.py').write_text(
+            'import sys\n'
+            f'target = {str(self.repo / "app.txt")!r}\n'
+            'def audit(event, args):\n'
+            '    if event == "open" and args[0] == target:\n'
+            '        raise ValueError("unexpected audit failure")\n'
+            'sys.addaudithook(audit)\n')
+        self.env['PYTHONPATH'] = str(hooks)
+        before = self.files(self.repo)
+        state = self.files(self.state)
+        result = subprocess.run([sys.executable, str(SCRIPT), 'pending', str(self.scenario),
+                                 '--format', 'json'], cwd=self.repo, env=self.env,
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(1, result.returncode)
+        self.assertEqual('', result.stdout)
+        self.assertIn('Traceback', result.stderr)
+        self.assertIn('ValueError: unexpected audit failure', result.stderr)
+        self.assertEqual(before, self.files(self.repo))
+        self.assertEqual(state, self.files(self.state))
+
+    def git_wrapper(self, body):
+        real_git = shutil.which('git')
+        self.assertIsNotNone(real_git)
+        folder = self.base / 'bin'
+        folder.mkdir(exist_ok=True)
+        path = folder / 'git'
+        path.write_text(f'#!{sys.executable}\nimport os, sys\n' + body +
+                        f'\nos.execv({real_git!r}, [{real_git!r}, *sys.argv[1:]])\n')
+        path.chmod(0o755)
+        self.env['PATH'] = str(folder) + os.pathsep + os.environ.get('PATH', '')
+
+    def test_git_read_failure_invalid_index(self):
+        """W3: a real unreadable Git index reports the repository and cause."""
+        (self.repo / '.git/index').write_bytes(b'broken index')
+        result = self.run_cli('pending', self.scenario, code=1)
+        self.assert_state_invalid(result, self.repo)
+        self.assertIn('index', str(result['problems']))
+
+    def test_git_read_failure_head_command(self):
+        """W3: failed HEAD lookup is distinct from a valid unborn branch."""
+        self.git_wrapper('if "--verify" in sys.argv:\n'
+                         '    sys.stderr.write("simulated HEAD read failure\\n")\n'
+                         '    sys.exit(73)\n')
+        result = self.run_cli('pending', self.scenario, code=1)
+        self.assert_state_invalid(result, self.repo)
+        self.assertIn('simulated HEAD read failure', str(result['problems']))
+
+    def test_git_read_failure_unavailable_command(self):
+        """W3: inability to start Git is a known repository-state error."""
+        self.env['PATH'] = ''
+        result = self.run_cli('pending', self.scenario, code=1)
+        self.assert_state_invalid(result, self.repo)
+        self.assertIn('git', str(result['problems']))
+
+    def test_git_read_failure_broken_repository(self):
+        """W3: corrupt metadata differs from running outside a Git repository."""
+        (self.repo / '.git/HEAD').write_text('broken HEAD\n')
+        result = self.run_cli('pending', self.scenario, code=1)
+        self.assert_state_invalid(result, self.repo)
+
+    def test_state_invalid_write_failure_leaves_no_files(self):
+        """W3: real OS write failures are classified and leave no partial records."""
+        results = self.results_file()
+        cases = self.write_json(self.base / 'cases.json', {'cases': [dict(id='TC', title='case')]})
+        pairs = self.write_json(self.base / 'pairs.json', dict(covered=[], conflict=[], disposed=[]))
+        commands = [('submit', self.scenario, '--results', results),
+                    ('import-cases', self.scenario, cases),
+                    ('coverage', self.scenario, '--pairs', pairs)]
+        for command in commands:
+            for limit in (0, 128):
+                with self.subTest(command=command[0], limit=limit):
+                    path = self.base / f'quota-{command[0]}-{limit}'
+                    self.env['SOP_VERIFY_STATE'] = str(path)
+                    result = self.run_cli(*command, code=1, file_size_limit=limit)
+                    self.assert_state_invalid(result, path)
+                    self.assertEqual({}, self.files(path))
+
+    def test_state_invalid_round_collision_has_no_source_stale(self):
+        """W3: a concurrent round destination is state trouble, not a source change."""
+        counter = self.base / 'status-count'
+        target = self.batch_path() / 'rounds/1'
+        self.git_wrapper('from pathlib import Path\n'
+                         'if "status" in sys.argv:\n'
+                         f'    counter = Path({str(counter)!r})\n'
+                         '    count = int(counter.read_text()) + 1 if counter.exists() else 1\n'
+                         '    counter.write_text(str(count))\n'
+                         f'    if count == 2: Path({str(target)!r}).mkdir(parents=True)\n')
+        result = self.run_cli('submit', self.scenario, '--results', self.results_file(), code=1)
+        self.assert_state_invalid(result, target)
+        self.assertEqual({}, self.files(self.state))
 
     def test_submit_rejects_source_or_scenario_change_during_read(self):
         """I1 source-stale: real concurrent edits while a FIFO result is read."""
@@ -767,7 +999,7 @@ test_cases:
         batch.mkdir(parents=True)
         (batch / 'rounds').symlink_to(self.repo, target_is_directory=True)
         result = self.run_cli('submit', self.scenario, '--results', self.results_file(), code=1)
-        self.assertEqual('source-stale', result['error_code'])
+        self.assertEqual('state-invalid', result['error_code'])
         self.assertFalse((batch / 'batch.json').exists())
 
     def test_git_index_unchanged_when_file_stat_needs_refresh(self):

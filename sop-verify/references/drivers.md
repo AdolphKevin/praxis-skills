@@ -71,13 +71,14 @@ python3 "$SOP_PY" --root "$REPO" report "$SCENARIOS" --format json
 | `entries-invalid` | 补齐有效入口声明 |
 | `scenario-results-invalid` | 按行号补齐结果、真实时间和可读取的证据；空文件至少填写一条结果 |
 | `scenario-results-incomplete` | 补齐列出的待执行场景结果 |
-| `source-stale` | 登记期间场景或产品变化时，按当前内容重新准备本轮 |
+| `source-stale` | 仅用于登记前后场景 SHA-256 或产品指纹不一致，按当前版本重新准备本轮 |
+| `state-invalid` | 按问题中的路径和原因，恢复仓库外、无符号链接且可读写的状态目录与记录，处理记录解析问题，或修复 Git 读取问题 |
 | `batch-conflict` | 核对已绑定的场景路径，为不同场景文件使用独立批次 |
 | `cases-invalid` | 修正用例结构、必填字段或重复编号 |
 | `scenario-coverage-incomplete` | 按列出的用例与场景，处理遗漏、重复归类、冲突和无效引用 |
 | `not-a-git-repository` | 将 `REPO` 指向实际 Git 仓库 |
 
-状态目录不可用时，保存工具实际输出，检查目录位置和可写性，恢复后重试。
+保存工具的实际输出。已识别的问题按上表处理；其余异常保留原始异常信息，依据该信息定位原因。
 
 ## 独立会话交接
 
