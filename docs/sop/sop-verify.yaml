@@ -1,6 +1,7 @@
 # SOP-VERIFY-1：sop-verify 本机模式的验收场景
 # 预期只依据 team-workflow 仓库的 SOP 验证独立化方案 v7 与 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 与任务 T2，不依据当前实现的输出。
 # 版本 1（2026-10-19）：Claude 依据上述两份原文编写，AdolphKevin 2026-10-19 确认。
+# 版本 2（2026-10-19）：随方案修订 2 新增 SOP-03-N03（状态目录不可用时报 state-invalid），AdolphKevin 2026-10-19 批准。
 #
 # 下文"演示仓库"指：未接入 tw 的临时 Git 仓库，已提交一个产品文件 app.txt；docs/sop/demo.yaml 为合格的场景文件
 # （批次 demo，节点 N1、N2，各一条正向与一条反向场景，共四条，verify 均为 cli）；docs/sop/entries.yaml 声明 cli 入口；
@@ -9,14 +10,14 @@
 metadata:
   requirement: "sop-verify 本机模式：场景与入口核对、待执行清单、结果登记、用例导入与覆盖、报告、技能对话"
   batch: "sop-verify-1"
-  version: 1
+  version: 2
   owner: "AdolphKevin"
   sources:
     - ref: "AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 2、3、4 节"
       version: "v7（2026-10-19）"
       confirmed_by: "AdolphKevin"
     - ref: "docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节与任务 T2"
-      version: "修订 1"
+      version: "修订 2"
       confirmed_by: "AdolphKevin"
   tags: ["sop-verify", "本机模式"]
 
@@ -224,6 +225,20 @@ sops:
         expected: ["退出码为 1，错误代码 scenario-results-invalid", "四个问题各自给出所在行号 1、2、3、4"]
         forbidden_effects: ["状态目录中出现轮次", "复制任何证据"]
         evidence_hints: ["完整输出", "状态目录文件清单"]
+
+      - id: SOP-03-N03
+        polarity: negative
+        negative_type: invalid-input
+        title: 状态目录不可用时报 state-invalid 且不写文件
+        actor: 执行者
+        priority: P1
+        refs: ["I1", "D2"]
+        verify: cli
+        initial_state: ["演示仓库", "仓库外的结果目录中有覆盖四条场景的合格结果文件与证据"]
+        steps: ["把 SOP_VERIFY_STATE 设为演示仓库内的 .state 目录后运行 submit", "把 SOP_VERIFY_STATE 设为一个没有写权限的目录后运行 submit"]
+        expected: ["两次退出码都为 1，错误代码 state-invalid，问题写出该目录路径与原因", "错误代码不是 source-stale"]
+        forbidden_effects: ["演示仓库内出现 .state 或其他新文件", "登记任何轮次"]
+        evidence_hints: ["两次命令的完整输出", "前后文件清单"]
 
   - id: SOP-04
     title: 用例导入与覆盖

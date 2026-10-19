@@ -1,7 +1,7 @@
 ---
 design: "D-sop-verify-1"
 task: "SOP-VERIFY-1"
-revision: 1
+revision: 2
 assessment: {"complexity":"medium","risks":["public-contract"],"effort":"约一个半工作日代理时长","drivers":["新增命令行工具与五种文件格式，成员与看板按格式协作","技能文本决定代理在业务仓库中的对话与派遣","场景与结果字段与 team-workflow 同义，两边各自实现"],"uncertainties":[],"required_skills":["Python 标准库","Git","技能写作"]}
 roles: {"design_owner":"Claude","implementation_owner":"Codex","acceptance_owner":"AdolphKevin"}
 ---
@@ -10,7 +10,7 @@ roles: {"design_owner":"Claude","implementation_owner":"Codex","acceptance_owner
 
 > 本文件是 tw 任务 SOP-VERIFY-1 的方案原文。总体设计与决定见 team-workflow 仓库的 `docs/proposals/2026-10-19-standalone-sop-verification.md`（v7），本需求对应其第 8 节第一行。验收场景见 [docs/sop/sop-verify.yaml](../sop/sop-verify.yaml)。
 >
-> 状态：修订 1，AdolphKevin 于 2026-10-19 批准方案与场景文件。
+> 状态：修订 2。修订 1 由 AdolphKevin 于 2026-10-19 批准；修订 2 新增错误代码 `state-invalid`，AdolphKevin 同日批准。
 
 ## 全局范围
 <!-- tw-section id=scope-global type=global-scope -->
@@ -40,7 +40,7 @@ roles: {"design_owner":"Claude","implementation_owner":"Codex","acceptance_owner
 | coverage | `<场景文件> --pairs <配对文件>` | 按历次导入的并集核对配对，保存配对快照与结论 |
 | report | `<场景文件> [--format markdown\|json]` | 按数据 D2 输出报告到标准输出；缺省 markdown |
 
-退出码：0 成功；1 输入或状态问题；2 参数用法错误。json 输出是一个对象，含 `ok`；失败时含 `error_code` 与 `problems`，每项 `{line, problem}`，与行无关时 `line` 为 null。错误代码：`scenario-file-invalid`、`entries-invalid`、`scenario-results-invalid`、`scenario-results-incomplete`、`source-stale`、`batch-conflict`、`cases-invalid`、`scenario-coverage-incomplete`、`not-a-git-repository`。text 输出逐条写出同样的问题与行号。
+退出码：0 成功；1 输入或状态问题；2 参数用法错误。json 输出是一个对象，含 `ok`；失败时含 `error_code` 与 `problems`，每项 `{line, problem}`，与行无关时 `line` 为 null。错误代码：`scenario-file-invalid`、`entries-invalid`、`scenario-results-invalid`、`scenario-results-incomplete`、`source-stale`、`batch-conflict`、`cases-invalid`、`scenario-coverage-incomplete`、`not-a-git-repository`、`state-invalid`。text 输出逐条写出同样的问题与行号。
 
 入口来源依次为 `--entries`、场景文件同目录的 `entries.yaml`、仓库 `.tw/config.json` 的 `acceptance_entries`；都没有时报 `entries-invalid`。`entries.yaml` 与 `.tw/config.json` 同时存在时使用前者，并把两处同名而内容不同的入口列为提示。
 
@@ -55,7 +55,7 @@ roles: {"design_owner":"Claude","implementation_owner":"Codex","acceptance_owner
 | 由回归守护 | 同上，但声明了 `regression.check`；输出提示"需确认该检查在当前源码通过" | 否 |
 | 受阻 | 最新结果为 `blocked` 或 `skip`，附 `finding` | 否 |
 
-`submit` 要求结果覆盖清单中的全部场景，可附带清单外场景的结果。登记前后各取一次场景文件 sha256 与产品指纹，期间变化时拒绝，错误代码 `source-stale`。批次名已属于同一检出目录中另一个场景文件路径时拒绝，错误代码 `batch-conflict`。
+`submit` 要求结果覆盖清单中的全部场景，可附带清单外场景的结果。登记前后各取一次场景文件 sha256 与产品指纹，期间变化时拒绝，错误代码 `source-stale`。批次名已属于同一检出目录中另一个场景文件路径时拒绝，错误代码 `batch-conflict`。状态目录位于仓库内、含符号链接或无法读写，记录文件无法读取，或 git 无法读取仓库状态时，错误代码 `state-invalid`，问题写明路径与原因；`source-stale` 只表示登记期间场景文件或产品指纹发生了变化。
 
 独立性：给出 `--implementer` 时，执行者与实现者的姓名折叠大小写、去掉首尾空白并把连续空白合为一个后相同标 `self-check`，不同标 `independent`；未给出时标 `undeclared`。三种标注都照常登记。
 
@@ -102,7 +102,7 @@ roles: {"design_owner":"Claude","implementation_owner":"Codex","acceptance_owner
 SOP-01 节点全部场景通过。
 
 - 场景：docs/sop/sop-verify.yaml#SOP-01
-- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 1；确认人 AdolphKevin
+- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 2；确认人 AdolphKevin
 - 检查：unit
 - 验证：自动
 
@@ -111,7 +111,7 @@ SOP-01 节点全部场景通过。
 SOP-02 节点全部场景通过。
 
 - 场景：docs/sop/sop-verify.yaml#SOP-02
-- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 1；确认人 AdolphKevin
+- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 2；确认人 AdolphKevin
 - 检查：unit
 - 验证：自动
 
@@ -120,7 +120,7 @@ SOP-02 节点全部场景通过。
 SOP-03 节点全部场景通过。
 
 - 场景：docs/sop/sop-verify.yaml#SOP-03
-- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 1；确认人 AdolphKevin
+- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 2；确认人 AdolphKevin
 - 检查：unit
 - 验证：自动
 
@@ -129,7 +129,7 @@ SOP-03 节点全部场景通过。
 SOP-04 节点全部场景通过。
 
 - 场景：docs/sop/sop-verify.yaml#SOP-04
-- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 1；确认人 AdolphKevin
+- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 2；确认人 AdolphKevin
 - 检查：unit
 - 验证：自动
 
@@ -138,7 +138,7 @@ SOP-04 节点全部场景通过。
 SOP-05 节点全部场景通过。
 
 - 场景：docs/sop/sop-verify.yaml#SOP-05
-- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 1；确认人 AdolphKevin
+- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 2；确认人 AdolphKevin
 - 检查：unit
 - 验证：自动
 
@@ -147,7 +147,7 @@ SOP-05 节点全部场景通过。
 SOP-06 节点全部场景通过。技能场景由只装候选技能的新会话执行，没有自动检查。
 
 - 场景：docs/sop/sop-verify.yaml#SOP-06
-- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节与 D10；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的任务 T2；版本 修订 1；确认人 AdolphKevin
+- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节与 D10；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的任务 T2；版本 修订 2；确认人 AdolphKevin
 - 检查：无
 
 ## 任务 T1：sop.py 与测试
