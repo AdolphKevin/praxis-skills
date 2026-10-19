@@ -20,11 +20,12 @@
 # “测试岗用例文件”指退款仓库外符合测试岗 Schema 的 cases.yaml：TC_REFUND_FLOW_001、002（section:申请退款）与 003、004（section:审核退款），003 的 tags 含 negative；
 # TC_REFUND_FLOW_002 与 SOP-01-P02 表述不同而角色、初始状态、入口与全部预期相同；SOP-01-N02 的预期与任何用例都不同。
 # “技能会话”指只装候选 sop-verify 技能的新会话，在退款仓库中按场景原话执行；会话请求确认时由执行者以 SOP 负责人身份答复。
+# 版本 2（2026-10-20）：按测试代理 sop-verify-2-tester 的复核补全断言（pending 只读、regression_status 取值与缺失、复核意见、未知检查字段、项目不存在、批次冲突在推送前），经 AdolphKevin 授权由 Claude 代批。
 
 metadata:
   requirement: "sop-verify 看板客户端与以用例为准：看板配置与推送登记、读取看板、取回合并结果、入口与检查声明、技能文本、驱动的结果输出与引用更正"
   batch: "sop-verify-2"
-  version: 1
+  version: 2
   owner: "AdolphKevin"
   sources:
     - ref: "AdolphKevin/sop-board docs/proposals/2026-10-19-standalone-sop-verification.md 的 D2、D3、D9、D16、D23、D29 与第 4 节 S1、S2、S7"
@@ -260,7 +261,7 @@ sops:
         verify: cli
         initial_state: ["演示仓库，已在看板模式下用合格结果文件 submit 过 docs/sop/demo.yaml", "真实看板与记录代理，看板模式", "结果文件甲缺少 N2-N01 的结果；结果文件乙中 N1-P01 为 pass 而没有证据；场景文件丙 docs/sop/bad.yaml 中一条场景缺少 expected；场景文件丁 docs/sop/demo-copy.yaml 为 demo.yaml 的副本（批次同为 demo）"]
         steps: ["清空记录代理的记录", "用结果文件甲运行 submit docs/sop/demo.yaml --format json", "用结果文件乙运行 submit docs/sop/demo.yaml --format json", "对场景文件丙运行 submit --format json", "对场景文件丁运行 submit --format json", "查看记录代理的请求记录与批次页面"]
-        expected: ["甲的退出码为 1，error_code 为 scenario-results-incomplete，列出 N2-N01", "乙的退出码为 1，error_code 为 scenario-results-invalid，并给出行号 1", "丙的退出码为 1，error_code 为 scenario-file-invalid，并给出缺少 expected 的场景所在行号", "丁的退出码为 1，error_code 为 batch-conflict", "甲、乙、丙三次运行中记录代理没有收到 PUT scenario-file、POST evidence 或 POST rounds", "四次运行都没有发出 POST rounds，看板上批次 demo 的轮次数不变"]
+        expected: ["甲的退出码为 1，error_code 为 scenario-results-incomplete，列出 N2-N01", "乙的退出码为 1，error_code 为 scenario-results-invalid，并给出行号 1", "丙的退出码为 1，error_code 为 scenario-file-invalid，并给出缺少 expected 的场景所在行号", "丁的退出码为 1，error_code 为 batch-conflict", "甲、乙、丙、丁四次运行中记录代理都没有收到 PUT scenario-file、POST evidence 或 POST rounds（丁的 batch-conflict 在推送前报出）", "四次运行都没有发出 POST rounds，看板上批次 demo 的轮次数不变"]
         forbidden_effects: ["向看板推送丙的内容", "状态目录中出现轮次"]
         evidence_hints: ["四次命令的完整输出", "记录代理的请求记录"]
 
@@ -296,7 +297,7 @@ sops:
         verify: cli
         initial_state: ["演示仓库", "真实看板与记录代理；第 1 轮已由 submit 登记：N1-P01、N2-P01、N2-N01 为 pass，N1-N01 为 fail", "此后经真实看板的标记接口为 N2-P01 登记人工 blocked，defect_url 为 https://github.com/demo-org/demo-app/issues/7（第 2 轮）", "本地修改 N1-P01 的 expected，并在 N2 中新增场景 N2-P02（只改 docs/sop/demo.yaml，未推送）", "SOP_BOARD_URL 指向记录代理，SOP_BOARD_TOKEN 未设置"]
         steps: ["运行 pending docs/sop/demo.yaml", "运行 pending docs/sop/demo.yaml --format json", "查看记录代理的请求记录，列出状态目录，运行 git status --porcelain"]
-        expected: ["两次退出码均为 0，没有报 board-token-missing", "清单恰为：N1-P01 原因 changed，N2-P02 原因 new，N1-N01 原因 failed，N2-P01 原因 failed", "N2-N01 不在清单中", "输出格式与 SOP-VERIFY-1 的 pending 相同，另附批次页面地址 <SOP_BOARD_URL>/p/github-com-demo-org-demo-app/b/demo", "记录代理只收到 GET 请求，其中有 GET /api/v1/projects/github-com-demo-org-demo-app/batches/demo/scenarios", "输出中没有“本机有未推送的产品改动”提示", "git status 只显示 docs/sop/demo.yaml 的本地修改，状态目录没有新增文件"]
+        expected: ["两次退出码均为 0，没有报 board-token-missing", "清单恰为：N1-P01 原因 changed，N2-P02 原因 new，N1-N01 原因 failed，N2-P01 原因 failed", "N2-N01 不在清单中", "输出格式与 SOP-VERIFY-1 的 pending 相同，另附批次页面地址 <SOP_BOARD_URL>/p/github-com-demo-org-demo-app/b/demo", "记录代理只收到 GET /api/v1/projects/github-com-demo-org-demo-app/batches/demo/scenarios 请求，没有其他请求", "git status 只显示 docs/sop/demo.yaml 的本地修改，状态目录没有新增文件"]
         forbidden_effects: ["pending 发出 PUT 或 POST 请求", "pending 写入任何文件"]
         evidence_hints: ["两次命令的完整输出", "记录代理的请求记录", "git status 与状态目录文件清单"]
 
@@ -307,22 +308,22 @@ sops:
         priority: P0
         refs: ["I3"]
         verify: cli
-        initial_state: ["演示仓库的 docs/sop/demo.yaml 改为八条场景并已提交：节点 N1 含 N1-P01、N1-P02、N1-P03、N1-N01，节点 N2 含 N2-P01、N2-P02、N2-P03、N2-N01", "SOP_BOARD_URL 指向模拟看板，SOP_BOARD_TOKEN 未设置", "模拟看板对 GET …/batches/demo/scenarios 返回：N1-P01 指纹相同、没有结果；N1-P02 指纹不同；不含 N1-P03；N1-N01 最新 Agent 结果 fail（第 2 轮）、没有人工结果；N2-P01 最新 Agent 结果 pass（第 1 轮）、最新人工结果 fail（第 3 轮）；N2-P02 在待执行队列、最新 Agent 结果 pass（第 1 轮）；N2-P03 最新 Agent 结果 fail（第 2 轮）、最新人工结果 pass（第 5 轮）；N2-N01 在复测队列、最新 Agent 结果 pass（第 4 轮）；未提到的指纹均与本地相同", "模拟看板给出的批次最新产品指纹与本机产品指纹相同"]
+        initial_state: ["演示仓库的 docs/sop/demo.yaml 改为八条场景并已提交：节点 N1 含 N1-P01、N1-P02、N1-P03、N1-N01，节点 N2 含 N2-P01、N2-P02、N2-P03、N2-N01", "SOP_BOARD_URL 指向模拟看板，SOP_BOARD_TOKEN 未设置", "模拟看板对 GET …/batches/demo/scenarios 返回：N1-P01 指纹相同、没有结果；N1-P02 指纹不同；不含 N1-P03；N1-N01 最新 Agent 结果 fail（第 2 轮）、没有人工结果；N2-P01 最新 Agent 结果 pass（第 1 轮）、最新人工结果 fail（第 3 轮）；N2-P02 在待执行队列、最新 Agent 结果 pass（第 1 轮）；N2-P03 最新 Agent 结果 fail（第 2 轮）、最新人工结果 pass（第 5 轮）；N2-N01 在复测队列、最新 Agent 结果 pass（第 4 轮）；未提到的指纹均与本地相同"]
         steps: ["运行 pending docs/sop/demo.yaml --format json", "运行 pending docs/sop/demo.yaml", "查看模拟看板的请求记录"]
-        expected: ["两次退出码均为 0", "清单恰为：N1-P01 原因 new，N1-P02 原因 changed，N1-P03 原因 new，N1-N01 原因 failed，N2-P01 原因 failed，N2-P02 原因 source-changed", "N2-P03 与 N2-N01 不在清单中，也不在由回归守护或受阻部分", "两种格式的清单内容相同，都附批次页面地址", "模拟看板只收到 GET 请求"]
+        expected: ["两次退出码均为 0", "清单恰为：N1-P01 原因 new，N1-P02 原因 changed，N1-P03 原因 new，N1-N01 原因 failed，N2-P01 原因 failed，N2-P02 原因 source-changed", "N2-P03 与 N2-N01 不在清单中，也不在由回归守护或受阻部分", "两种格式的清单内容相同，都附批次页面地址", "模拟看板只收到 GET /api/v1/projects/github-com-demo-org-demo-app/batches/demo/scenarios 请求，没有其他请求"]
         forbidden_effects: ["发出 PUT 或 POST 请求", "状态目录或演示仓库出现新文件"]
         evidence_hints: ["两次命令的完整输出", "模拟看板的预设响应与请求记录"]
 
       - id: SOP-22-P03
         polarity: positive
-        title: "声明回归检查的场景列为由回归守护并附检查结果，受阻与跳过单列，本机产品改动给出提示"
+        title: "声明回归检查的场景按看板的 regression_status 列为由回归守护或按 failed 进入清单，受阻与跳过单列"
         actor: "验收负责人"
         priority: P1
         refs: ["I3", "D1"]
         verify: cli
-        initial_state: ["演示仓库：docs/sop/entries.yaml 增加顶层 checks，声明检查 unit（argv、format: junit、report）；场景改为 N1-P01、N1-P02、N1-P03、N1-N01、N2-P01、N2-N01，其中 N1-P01、N1-P02、N1-P03 声明 regression: {check: unit, cases: [test_a]}；已提交", "SOP_BOARD_URL 指向模拟看板", "模拟看板返回六条场景，指纹均与本地相同：N1-P01 在待执行队列、有过 Agent pass、检查结果为检查待运行；N1-P02 最新 Agent 结果 pass、检查结果为检查通过；N1-P03 最新 Agent 结果 pass、检查结果为检查失败；N1-N01 在复测队列、最新 Agent 结果 pass；N2-P01 最新 Agent 结果 blocked，finding 为 Q1 测试库不可用；N2-N01 最新 Agent 结果 skip，finding 为 Q2 缺少测试账号", "模拟看板给出的批次最新产品指纹等于当前提交的本机产品指纹"]
-        steps: ["修改 app.txt 后不提交，运行 pending docs/sop/demo.yaml", "恢复 app.txt，运行 pending docs/sop/demo.yaml --format json"]
-        expected: ["N1-P01 列在“由回归守护”下并附“检查待运行”，N1-P02 列在“由回归守护”下并附“检查通过”，两者都不在待执行清单中", "N1-P03 在待执行清单中，原因为 failed", "N2-P01 与 N2-N01 列在“受阻”下，分别附 finding Q1 测试库不可用 与 Q2 缺少测试账号，都不在待执行清单中", "N1-N01 不在清单中", "第一次输出附提示“本机有未推送的产品改动，看板的待执行判断基于已推送的版本”", "第二次输出没有该提示，清单与分组同第一次"]
+        initial_state: ["演示仓库：docs/sop/entries.yaml 增加顶层 checks，声明检查 unit（argv、format: junit、report）；场景改为 N1-P01、N1-P02、N1-P03、N1-P04、N1-N01、N2-P01、N2-N01，其中 N1-P01 至 N1-P04 声明 regression: {check: unit, cases: [test_a]}；已提交", "SOP_BOARD_URL 指向模拟看板", "模拟看板对 GET …/batches/demo/scenarios 返回七条场景，指纹均与本地相同：N1-P01 在待执行队列、有过 Agent pass、regression_status 为 pending；N1-P02 最新 Agent 结果 pass、regression_status 为 passed；N1-P03 最新 Agent 结果 pass、regression_status 为 failed；N1-P04 最新 Agent 结果 pass、没有 regression_status 字段；N1-N01 在复测队列、最新 Agent 结果 pass；N2-P01 最新 Agent 结果 blocked，finding 为 Q1 测试库不可用；N2-N01 最新 Agent 结果 skip，finding 为 Q2 缺少测试账号"]
+        steps: ["运行 pending docs/sop/demo.yaml", "运行 pending docs/sop/demo.yaml --format json"]
+        expected: ["N1-P01 与 N1-P04 列在“由回归守护”下并附“检查待运行”，N1-P02 列在“由回归守护”下并附“检查通过”，三者都不在待执行清单中", "N1-P03 在待执行清单中，原因为 failed", "N2-P01 与 N2-N01 列在“受阻”下，分别附 finding Q1 测试库不可用 与 Q2 缺少测试账号，都不在待执行清单中", "N1-N01 不在清单中", "两种格式的清单与分组相同"]
         forbidden_effects: ["受阻、跳过或检查未失败的回归守护场景进入待执行清单"]
         evidence_hints: ["两次命令的完整输出", "模拟看板的预设响应"]
 
@@ -348,8 +349,8 @@ sops:
         refs: ["I3"]
         verify: cli
         initial_state: ["演示仓库；状态目录中批次 demo 有本机模式下的第 1 轮，四条场景均为 pass", "真实看板上项目 github-com-demo-org-demo-app 已由另一批次 other 的 submit 建立，没有批次 demo；GET …/batches/demo/scenarios 返回 404 batch-not-found", "SOP_BOARD_URL 指向真实看板"]
-        steps: ["运行 pending docs/sop/demo.yaml --format json", "运行 pending docs/sop/demo.yaml"]
-        expected: ["两次退出码均为 0", "四条场景都在清单中，原因均为 new", "输出附批次页面地址 <SOP_BOARD_URL>/p/github-com-demo-org-demo-app/b/demo"]
+        steps: ["运行 pending docs/sop/demo.yaml --format json", "运行 pending docs/sop/demo.yaml", "设置 SOP_BOARD_PROJECT 为看板上不存在的 github.com/demo-org/absent-app，再运行 pending docs/sop/demo.yaml --format json"]
+        expected: ["两次退出码均为 0", "三次都列出全部四条场景，原因均为 new（第三次看板返回 404 project-not-found）", "输出附批次页面地址 <SOP_BOARD_URL>/p/github-com-demo-org-demo-app/b/demo"]
         forbidden_effects: ["按本机第 1 轮把清单判为空", "报 board-rejected"]
         evidence_hints: ["两次命令的完整输出", "GET scenarios 的响应"]
 
@@ -576,14 +577,14 @@ sops:
       - id: SOP-24-N02
         polarity: negative
         negative_type: invalid-input
-        title: "检查的字段不合格时报 entries-invalid 并给出行号"
+        title: "检查的核对字段不合格时报 entries-invalid 并给出行号，未知字段原样接受"
         actor: "方案作者"
         priority: P0
         refs: ["D1"]
         verify: cli
-        initial_state: ["仓库外五份 entries.yaml，入口合格，顶层 checks 各只有一处问题：format 为 junit 而缺 report；format 为 tap；timeout 为 0；argv 为空数组；cwd 为数字 5"]
-        steps: ["分别以 --entries 指定五份文件运行 check docs/sop/demo.yaml --format json"]
-        expected: ["五次退出码均为 1，error_code 为 entries-invalid", "每次 problems 都给出该处问题所在的行号"]
+        initial_state: ["仓库外五份 entries.yaml，入口合格，顶层 checks 各只有一处问题：format 为 junit 而缺 report；format 为 tap；timeout 为 0；argv 为空数组；cwd 为数字 5", "另一份 entries.yaml 的检查 unit 合格，另含未知字段 foo: bar"]
+        steps: ["分别以 --entries 指定五份不合格的文件运行 check docs/sop/demo.yaml --format json", "以 --entries 指定含 foo 的文件运行 check docs/sop/demo.yaml --format json"]
+        expected: ["前五次退出码均为 1，error_code 为 entries-invalid", "前五次的 problems 都给出该处问题所在的行号", "含 foo 的文件退出码为 0，ok 为 true，没有报 entries-invalid"]
         forbidden_effects: ["check 写入任何文件"]
         evidence_hints: ["五份文件原文", "五次命令的完整输出"]
 
@@ -698,9 +699,9 @@ sops:
         priority: P1
         refs: ["D2"]
         verify: skill
-        initial_state: ["同 SOP-25-P04 的会话与仓库，另把 SOP-01-P02 的 expected 改为含只能在浏览器中观察的结果“页面弹出退款成功提示框”（确认后重新执行通过）；仓库没有浏览器测试体系"]
-        steps: ["让会话完成沉淀流程，统计复核会话的轮数", "查看场景文件、仓库改动与会话的最终说明"]
-        expected: ["复核不超过三轮，每轮由新会话进行，复核中的临时改动全部丢弃", "三轮仍未通过的场景没有写回归声明", "会话告知使用者这些场景继续由浏览器执行，并说明理由"]
+        initial_state: ["同 SOP-25-P04 的会话与仓库，另在 SOP-01-P02 的 forbidden_effects 中加入“向外部支付渠道发出第二次退款请求”（确认后重新执行通过）", "scripts/refund.py 直接调用外部支付渠道的客户端，仓库内没有可替换该客户端的接缝，单元、接口与集成测试都无法观察渠道侧请求，沉淀出的测试必然漏掉这一项禁止副作用"]
+        steps: ["让会话完成沉淀流程，统计复核会话的轮数与每轮意见", "查看场景文件、仓库改动与会话的最终说明"]
+        expected: ["至少进行了一轮复核，且复核对 SOP-01-P02 的测试提出了意见（未覆盖上述禁止副作用）", "复核不超过三轮，每轮由新会话进行，复核中的临时改动全部丢弃", "三轮仍未通过的场景没有写回归声明", "会话告知使用者这些场景继续由浏览器执行，并说明理由"]
         forbidden_effects: ["第四轮复核", "为未通过复核的场景写入 regression: {check, cases}"]
         evidence_hints: ["会话与各复核会话的记录", "仓库差异"]
 

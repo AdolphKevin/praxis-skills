@@ -63,7 +63,7 @@ roles: {"design_owner":"Claude","implementation_owner":"Codex","acceptance_owner
 
 ## 入口与检查声明
 <!-- tw-section id=D1 type=data depends=scope-global -->
-`entries.yaml` 的入口增加可选字段：`candidate` 取 `checkout`、`start`、`in-place`，缺省 `in-place`；`start` 与 `reload` 为非空字符串数组，`candidate` 为 `start` 时 `start` 与 `address_env` 必填。顶层增加可选 `checks`，字段同 tw 的 `checks`：核对 `argv`（非空字符串数组）、`cwd`（字符串，缺省 `.`）、`timeout`（正整数）、`format`（`junit` 或 `go-json`）、`report`（`format` 为 `junit` 时必填）、`required_env`（字符串数组）；tw 的其他检查字段（如 `purpose`、`required_cases`、`environment`、`coverage`）原样接受而不使用。入口与检查的来源同 SOP-VERIFY-1 的入口来源顺序；`entries.yaml` 与 `.tw/config.json` 同时存在时检查也取前者，两处同名而内容不同的检查列为提示。场景的 `regression.check` 引用的检查编号不在已声明的检查中时，`check`、`pending` 与 `submit` 报 `scenario-file-invalid` 并给出行号。不合格的入口与检查声明报 `entries-invalid` 并给出行号。
+`entries.yaml` 的入口增加可选字段：`candidate` 取 `checkout`、`start`、`in-place`，缺省 `in-place`；`start` 与 `reload` 为非空字符串数组，`candidate` 为 `start` 时 `start` 与 `address_env` 必填。顶层增加可选 `checks`，字段同 tw 的 `checks`：核对 `argv`（非空字符串数组）、`cwd`（字符串，缺省 `.`）、`timeout`（正整数）、`format`（`junit` 或 `go-json`）、`report`（`format` 为 `junit` 时必填）、`required_env`（字符串数组）；其他字段（含 tw 的 `purpose`、`required_cases`、`environment`、`coverage` 与任何未知字段）一律原样接受而不使用。入口与检查的来源同 SOP-VERIFY-1 的入口来源顺序；`entries.yaml` 与 `.tw/config.json` 同时存在时检查也取前者，两处同名而内容不同的检查列为提示。场景的 `regression.check` 引用的检查编号不在已声明的检查中时，`check`、`pending` 与 `submit` 报 `scenario-file-invalid` 并给出行号。不合格的入口与检查声明报 `entries-invalid` 并给出行号。
 
 ## 技能文本
 <!-- tw-section id=D2 type=data depends=scope-global,I2,I3,I4 -->
