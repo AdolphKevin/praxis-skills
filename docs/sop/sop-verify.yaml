@@ -1,0 +1,375 @@
+# SOP-VERIFY-1：sop-verify 本机模式的验收场景
+# 预期只依据 team-workflow 仓库的 SOP 验证独立化方案 v7 与 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 与任务 T2，不依据当前实现的输出。
+# 版本 1（2026-10-19）：Claude 依据上述两份原文编写，AdolphKevin 2026-10-19 确认。
+#
+# 下文"演示仓库"指：未接入 tw 的临时 Git 仓库，已提交一个产品文件 app.txt；docs/sop/demo.yaml 为合格的场景文件
+# （批次 demo，节点 N1、N2，各一条正向与一条反向场景，共四条，verify 均为 cli）；docs/sop/entries.yaml 声明 cli 入口；
+# XDG_STATE_HOME 指向一个临时目录，SOP_VERIFY_STATE 未设置。"候选脚本"指本仓候选版的 sop-verify/scripts/sop.py。
+
+metadata:
+  requirement: "sop-verify 本机模式：场景与入口核对、待执行清单、结果登记、用例导入与覆盖、报告、技能对话"
+  batch: "sop-verify-1"
+  version: 1
+  owner: "AdolphKevin"
+  sources:
+    - ref: "AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 2、3、4 节"
+      version: "v7（2026-10-19）"
+      confirmed_by: "AdolphKevin"
+    - ref: "docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节与任务 T2"
+      version: "修订 1"
+      confirmed_by: "AdolphKevin"
+  tags: ["sop-verify", "本机模式"]
+
+sops:
+
+  - id: SOP-01
+    title: 场景文件与入口核对
+    actor: "方案作者"
+    entry: "sop.py check"
+    must:
+      - "场景文件的结构、正反向规则与入口在执行前核对"
+      - "核对不写任何文件"
+    scenarios:
+
+      - id: SOP-01-P01
+        polarity: positive
+        title: 合格的场景文件通过核对并给出内容指纹
+        actor: 方案作者
+        priority: P0
+        refs: ["I1", "D1"]
+        verify: cli
+        initial_state: ["演示仓库"]
+        steps: ["在演示仓库的子目录中运行 python3 <候选脚本> check docs/sop/demo.yaml", "再加 --format json 运行一次"]
+        expected: ["两次退出码均为 0", "输出场景文件的 sha256 与四条场景各自的内容指纹", "json 输出的 ok 为 true，四个指纹与按 D1 规则独立计算的值相同"]
+        forbidden_effects: ["演示仓库内出现新文件或文件变化", "状态目录中出现文件"]
+        evidence_hints: ["命令原文与完整输出", "运行前后演示仓库与状态目录的文件清单", "独立计算指纹的脚本及其输出"]
+
+      - id: SOP-01-P02
+        polarity: positive
+        title: 没有 entries.yaml 时使用 tw 配置中的入口，两处不一致时提示
+        actor: 方案作者
+        priority: P1
+        refs: ["I1"]
+        verify: cli
+        initial_state: ["演示仓库，删除 docs/sop/entries.yaml", "仓库根有 .tw/config.json，其 acceptance_entries 声明 cli 入口"]
+        steps: ["运行 check docs/sop/demo.yaml", "恢复 entries.yaml，把其中 cli 入口的 operate 改为与 .tw/config.json 不同的文字，再运行 check"]
+        expected: ["第一次退出码为 0", "第二次退出码为 0，并提示 cli 入口在两处内容不同"]
+        forbidden_effects: ["修改 .tw/config.json 或 entries.yaml"]
+        evidence_hints: ["两次命令的完整输出", "两份入口文件的内容"]
+
+      - id: SOP-01-N01
+        polarity: negative
+        negative_type: incomplete-input
+        title: 节点缺少反向场景时指出节点与行号
+        actor: 方案作者
+        priority: P0
+        refs: ["D1"]
+        verify: cli
+        initial_state: ["演示仓库，删掉节点 N1 唯一的反向场景"]
+        steps: ["运行 check docs/sop/demo.yaml", "给 N1 加上非空的 negative_exempt 理由后再运行一次"]
+        expected: ["第一次退出码为 1，错误代码 scenario-file-invalid，点名 N1 并给出行号", "第二次退出码为 0"]
+        forbidden_effects: ["check 修改场景文件"]
+        evidence_hints: ["两次命令的完整输出"]
+
+      - id: SOP-01-N02
+        polarity: negative
+        negative_type: invalid-input
+        title: verify 引用未声明的入口时拒绝
+        actor: 方案作者
+        priority: P1
+        refs: ["D1"]
+        verify: cli
+        initial_state: ["演示仓库，把一条场景的 verify 改为 browser，入口文件中没有 browser"]
+        steps: ["运行 check docs/sop/demo.yaml"]
+        expected: ["退出码为 1，错误指出该场景编号、verify 的当前取值 browser 与所在行号"]
+        forbidden_effects: []
+        evidence_hints: ["完整输出"]
+
+      - id: SOP-01-N03
+        polarity: negative
+        negative_type: invalid-input
+        title: 超出 YAML 子集的写法报行号拒绝
+        actor: 方案作者
+        priority: P1
+        refs: ["D1"]
+        verify: cli
+        initial_state: ["演示仓库，在一条场景的 steps 上加锚点 &steps，并在另一条场景用别名 *steps 引用"]
+        steps: ["运行 check docs/sop/demo.yaml"]
+        expected: ["退出码为 1，错误给出锚点所在的行号"]
+        forbidden_effects: ["演示仓库或状态目录出现文件"]
+        evidence_hints: ["完整输出", "运行前后的文件清单"]
+
+  - id: SOP-02
+    title: 待执行清单
+    actor: "验收负责人"
+    entry: "sop.py pending"
+    must:
+      - "只列出需要执行的场景并给出原因"
+      - "已通过且未受影响的场景不重复执行"
+    scenarios:
+
+      - id: SOP-02-P01
+        polarity: positive
+        title: 新批次全部待执行，全部通过后清单为空
+        actor: 验收负责人
+        priority: P0
+        refs: ["I1"]
+        verify: cli
+        initial_state: ["演示仓库"]
+        steps: ["运行 pending docs/sop/demo.yaml --format json", "在仓库外写四条 pass 结果与证据，运行 submit", "再运行 pending"]
+        expected: ["第一次列出四条场景，原因均为 new", "submit 登记第 1 轮", "第二次待执行清单为空"]
+        forbidden_effects: ["pending 写入任何文件"]
+        evidence_hints: ["三次命令的完整输出", "状态目录文件清单"]
+
+      - id: SOP-02-P02
+        polarity: positive
+        title: 失败进入清单，受阻单列
+        actor: 验收负责人
+        priority: P1
+        refs: ["I1"]
+        verify: cli
+        initial_state: ["演示仓库"]
+        steps: ["第 1 轮提交两条 pass、一条 fail、一条 blocked（finding 为 Q1）", "运行 pending"]
+        expected: ["fail 的场景在清单中，原因 failed", "blocked 的场景不在清单中，列在受阻部分并带 Q1", "两条 pass 的场景不在清单中"]
+        forbidden_effects: []
+        evidence_hints: ["submit 与 pending 的完整输出"]
+
+      - id: SOP-02-N01
+        polarity: negative
+        negative_type: stale-input
+        title: 修改一条场景的预期后只有它待执行
+        actor: 验收负责人
+        priority: P0
+        refs: ["I1", "D1"]
+        verify: cli
+        initial_state: ["演示仓库，四条场景已在第 1 轮全部通过"]
+        steps: ["修改一条场景的 expected 文字并保存", "运行 pending"]
+        expected: ["清单只含该场景，原因 changed", "其余三条不在清单中"]
+        forbidden_effects: ["修改 docs/sop/ 下的文件使其他场景进入清单"]
+        evidence_hints: ["场景文件差异", "pending 的完整输出"]
+
+      - id: SOP-02-N02
+        polarity: negative
+        negative_type: stale-input
+        title: 产品变化后按回归声明区分
+        actor: 验收负责人
+        priority: P0
+        refs: ["I1", "D2"]
+        verify: cli
+        initial_state: ["演示仓库，四条场景已在第 1 轮全部通过；其中一条声明了 regression: {check: unit, cases: [Demo::test_a]}"]
+        steps: ["修改 app.txt", "运行 pending"]
+        expected: ["未声明 regression.check 的三条场景进入清单，原因 source-changed", "声明了 regression.check 的场景不在清单中，列在由回归守护部分，并提示需确认该检查在当前源码通过"]
+        forbidden_effects: []
+        evidence_hints: ["app.txt 的差异", "pending 的完整输出"]
+
+  - id: SOP-03
+    title: 结果登记
+    actor: "执行者"
+    entry: "sop.py submit"
+    must:
+      - "结果覆盖清单中的全部场景"
+      - "证据保存在仓库外，仓库不因登记而变化"
+    scenarios:
+
+      - id: SOP-03-P01
+        polarity: positive
+        title: 完整结果登记为一轮并保存证据
+        actor: 执行者
+        priority: P0
+        refs: ["I1", "D2"]
+        verify: cli
+        initial_state: ["演示仓库", "仓库外的结果目录中有 results.jsonl 与证据文件，覆盖四条场景：三条 pass、一条 fail"]
+        steps: ["记录演示仓库的 git status 与文件清单", "运行 submit docs/sop/demo.yaml --results <结果目录>/results.jsonl --implementer Zhang San", "再次记录 git status 与文件清单，列出状态目录"]
+        expected: ["退出码为 0，输出第 1 轮、执行数 4、四种结果数与通过率 3/4", "状态目录中有第 1 轮的 round.json 与证据副本，副本 sha256 与原文件相同", "round.json 记录场景文件 sha256、产品指纹、提交号与 dirty", "演示仓库的 git status 与文件清单不变"]
+        forbidden_effects: ["演示仓库内出现新文件"]
+        evidence_hints: ["命令原文与完整输出", "前后文件清单", "round.json 内容与证据 sha256 对照"]
+
+      - id: SOP-03-P02
+        polarity: positive
+        title: 独立性按事实标注，三种情况都登记
+        actor: 执行者
+        priority: P1
+        refs: ["I1"]
+        verify: cli
+        initial_state: ["演示仓库"]
+        steps: ["第 1 轮：执行者 Li Si，--implementer Zhang San", "修改一条场景的 expected 后第 2 轮：执行者写作 zhang  san（小写、两个空格），--implementer Zhang San", "修改另一条场景的 expected 后第 3 轮：执行者 Wang Wu，不给 --implementer", "运行 report --format json"]
+        expected: ["三轮都登记成功", "三轮的结果分别标 independent、self-check、undeclared", "报告的场景表中执行者与独立性对应各场景的最新结果"]
+        forbidden_effects: ["self-check 或 undeclared 的轮次被拒绝登记"]
+        evidence_hints: ["三次 submit 与 report 的完整输出"]
+
+      - id: SOP-03-N01
+        polarity: negative
+        negative_type: incomplete-input
+        title: 缺少待执行场景的结果时拒绝
+        actor: 执行者
+        priority: P0
+        refs: ["I1"]
+        verify: cli
+        initial_state: ["演示仓库", "结果文件只含四条场景中的三条"]
+        steps: ["运行 submit"]
+        expected: ["退出码为 1，错误代码 scenario-results-incomplete，列出缺少的场景编号"]
+        forbidden_effects: ["状态目录中出现轮次"]
+        evidence_hints: ["完整输出", "状态目录文件清单"]
+
+      - id: SOP-03-N02
+        polarity: negative
+        negative_type: invalid-input
+        title: 逐行指出结果文件的问题
+        actor: 执行者
+        priority: P0
+        refs: ["D1"]
+        verify: cli
+        initial_state: ["演示仓库", "结果文件四行各有一个问题：第 1 行 pass 没有证据；第 2 行证据路径为 ../outside.txt；第 3 行 executed_at 没有时区；第 4 行 blocked 没有 finding"]
+        steps: ["运行 submit"]
+        expected: ["退出码为 1，错误代码 scenario-results-invalid", "四个问题各自给出所在行号 1、2、3、4"]
+        forbidden_effects: ["状态目录中出现轮次", "复制任何证据"]
+        evidence_hints: ["完整输出", "状态目录文件清单"]
+
+  - id: SOP-04
+    title: 用例导入与覆盖
+    actor: "方案作者"
+    entry: "sop.py import-cases、sop.py coverage"
+    must:
+      - "历次导入的并集都要被配对覆盖"
+      - "用例的原有字段原样保存"
+    scenarios:
+
+      - id: SOP-04-P01
+        polarity: positive
+        title: 导入测试岗格式的用例并按编号取并集
+        actor: 方案作者
+        priority: P0
+        refs: ["D1"]
+        verify: cli
+        initial_state: ["演示仓库", "仓库外两份测试岗格式的用例文件：第一份 TC_DEMO_001 至 TC_DEMO_003，含 metadata、中文注释与带引号的流式 tags；第二份含改动过的 TC_DEMO_003 与新增的 TC_DEMO_004"]
+        steps: ["运行 import-cases docs/sop/demo.yaml <第一份>", "运行 import-cases docs/sop/demo.yaml <第二份>"]
+        expected: ["第一次新增 3、并集 3", "第二次新增 1、更新 1、未变 0、并集 4", "状态目录的并集中 TC_DEMO_003 为第二份的完整内容，各用例的 priority、steps、expected_results、tags 等字段与原文相同"]
+        forbidden_effects: ["演示仓库内出现新文件"]
+        evidence_hints: ["两次命令的完整输出", "并集快照与原文件的字段对照"]
+
+      - id: SOP-04-P02
+        polarity: positive
+        title: 每条用例恰好归一类时覆盖完整
+        actor: 方案作者
+        priority: P0
+        refs: ["D1"]
+        verify: cli
+        initial_state: ["SOP-04-P01 完成后的状态", "配对文件把 TC_DEMO_001 至 TC_DEMO_003 归入 covered，TC_DEMO_004 归入 disposed（out-of-scope，含理由与确认人）"]
+        steps: ["运行 coverage docs/sop/demo.yaml --pairs <配对文件>"]
+        expected: ["退出码为 0，结论为覆盖完整，四条用例各归一类"]
+        forbidden_effects: ["演示仓库内出现新文件"]
+        evidence_hints: ["完整输出", "配对文件"]
+
+      - id: SOP-04-N01
+        polarity: negative
+        negative_type: incomplete-input
+        title: 遗漏、重复归类与冲突分别列出
+        actor: 方案作者
+        priority: P0
+        refs: ["D1"]
+        verify: cli
+        initial_state: ["SOP-04-P01 完成后的状态", "配对文件遗漏 TC_DEMO_004，TC_DEMO_001 同时出现在 covered 与 conflict"]
+        steps: ["运行 coverage"]
+        expected: ["退出码为 1，错误代码 scenario-coverage-incomplete", "遗漏列出 TC_DEMO_004，重复归类列出 TC_DEMO_001，冲突列出 TC_DEMO_001"]
+        forbidden_effects: []
+        evidence_hints: ["完整输出", "配对文件"]
+
+      - id: SOP-04-N02
+        polarity: negative
+        negative_type: not-found
+        title: 配对引用不存在的场景时点名
+        actor: 方案作者
+        priority: P1
+        refs: ["D1"]
+        verify: cli
+        initial_state: ["SOP-04-P02 的状态，其中一项 covered 的 scenarios 写了不存在的 SOP-99-P01"]
+        steps: ["运行 coverage"]
+        expected: ["退出码为 1，错误点名 SOP-99-P01 及其所在的用例编号"]
+        forbidden_effects: []
+        evidence_hints: ["完整输出"]
+
+  - id: SOP-05
+    title: 报告
+    actor: "验收负责人"
+    entry: "sop.py report"
+    must:
+      - "比率同时给出分子与分母"
+      - "没有数据时如实写无数据"
+    scenarios:
+
+      - id: SOP-05-P01
+        polarity: positive
+        title: 报告含全部区块与正确数值
+        actor: 验收负责人
+        priority: P0
+        refs: ["D2"]
+        verify: cli
+        initial_state: ["演示仓库，场景文件含一行 # 待确认 Q1：退款上限待业务确认，一条场景声明 regression: {manual: 核对终端提示, owner: 验收负责人, trigger: 发布前}", "第 1 轮三条 pass、一条 fail；修复后第 2 轮该条 pass"]
+        steps: ["运行 report docs/sop/demo.yaml", "运行 report docs/sop/demo.yaml --format json"]
+        expected: ["Markdown 含头部、场景表、轮次表、一次通过率、回归声明、待确认预期、未验证范围七个区块", "第 1 轮通过率 3/4，第 2 轮 1/1，一次通过率 3/4", "回归声明 check 0、manual 1、pending 3", "待确认预期列出 Q1", "json 中的同名数值与 Markdown 相同，比率含 numerator、denominator、rate"]
+        forbidden_effects: ["report 写入任何文件"]
+        evidence_hints: ["两次命令的完整输出", "运行前后的文件清单"]
+
+      - id: SOP-05-N01
+        polarity: negative
+        negative_type: empty-input
+        title: 尚无轮次时如实写无数据
+        actor: 验收负责人
+        priority: P1
+        refs: ["D2"]
+        verify: cli
+        initial_state: ["演示仓库，没有登记任何轮次"]
+        steps: ["运行 report --format json", "运行 report"]
+        expected: ["json 中一次通过率的 numerator 与 denominator 为 0，rate 为 null", "Markdown 说明尚无执行记录，比率写无数据"]
+        forbidden_effects: ["报告把无数据写成 0%"]
+        evidence_hints: ["两次命令的完整输出"]
+
+  - id: SOP-06
+    title: 技能对话
+    actor: "业务仓库成员"
+    entry: "sop-verify 技能"
+    must:
+      - "推断的预期在确认前不进入 expected"
+      - "执行者默认是新开的会话，独立性如实标注"
+    scenarios:
+
+      - id: SOP-06-P01
+        polarity: positive
+        title: 一句话从 SOP 走到报告
+        actor: 业务仓库成员
+        priority: P0
+        refs: ["T2", "D10"]
+        verify: skill
+        initial_state: ["只装候选 sop-verify 技能的新会话", "未接入 tw 的临时业务仓库：docs/退款SOP.md 写了两个步骤，其中一步的失败提示文字未写明；scripts/refund.py 实现该流程"]
+        steps: ["对会话说：用 sop-verify 验证 docs/退款SOP.md", "会话提出待确认问题后，以 SOP 负责人的身份答复", "会话报告完成后，检查仓库、状态目录与会话记录"]
+        expected: ["会话写出 docs/sop/ 下的场景文件与 entries.yaml，每个节点有正向与反向场景，来源指向 docs/退款SOP.md", "未写明的失败提示作为待确认问题提出并停下，确认前没有写入 expected", "确认后会话运行 check，新开一个会话执行待执行场景，用 --implementer 登记结果，并给出报告", "仓库只新增 docs/sop/ 下的文件"]
+        forbidden_effects: ["写场景的会话以自己为执行者登记结果", "确认前登记任何轮次"]
+        evidence_hints: ["两个会话的完整记录", "仓库差异", "状态目录清单", "报告原文"]
+
+      - id: SOP-06-N01
+        polarity: negative
+        negative_type: not-found
+        title: 找不到 SOP 原文时先询问来源
+        actor: 业务仓库成员
+        priority: P0
+        refs: ["T2"]
+        verify: skill
+        initial_state: ["与 SOP-06-P01 相同的会话与仓库，删除 docs/退款SOP.md"]
+        steps: ["对会话说：用 sop-verify 验证退款流程"]
+        expected: ["会话说明找不到 SOP 原文并询问来源", "没有生成场景文件"]
+        forbidden_effects: ["依据代码或推测写出 expected"]
+        evidence_hints: ["会话记录", "仓库差异"]
+
+      - id: SOP-06-N02
+        polarity: negative
+        negative_type: other
+        title: 使用者要求不派新会话时如实标注独立性
+        actor: 业务仓库成员
+        priority: P1
+        refs: ["T2", "D4", "D10"]
+        verify: skill
+        initial_state: ["SOP-06-P01 中预期已确认、尚未执行的状态；scripts/refund.py 由当前会话在本次对话中写成"]
+        steps: ["对会话说：不要派新会话，就在这里执行并登记", "检查登记结果与报告"]
+        expected: ["当前会话执行并登记，--implementer 填写当前会话的身份", "报告中该轮标为 self-check"]
+        forbidden_effects: ["该轮被标为 independent", "省略 --implementer 使该轮显示为 undeclared"]
+        evidence_hints: ["会话记录", "submit 命令原文", "报告原文"]
