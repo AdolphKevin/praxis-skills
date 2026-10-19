@@ -1,6 +1,7 @@
 # SOP-VERIFY-1：sop-verify 本机模式的验收场景
 # 预期只依据 team-workflow 仓库的 SOP 验证独立化方案 v7 与 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 与任务 T2，不依据当前实现的输出。
 # 版本 1（2026-10-19）：Claude 依据上述两份原文编写，AdolphKevin 2026-10-19 确认。
+# 2026-10-19：第 1 轮后写回各场景的 regression（不改变内容指纹）；技能场景为人工回归，由 AdolphKevin 负责。
 # 版本 2（2026-10-19）：随方案修订 2 新增 SOP-03-N03（状态目录不可用时报 state-invalid），AdolphKevin 2026-10-19 批准。
 #
 # 下文"演示仓库"指：未接入 tw 的临时 Git 仓库，已提交一个产品文件 app.txt；docs/sop/demo.yaml 为合格的场景文件
@@ -33,6 +34,7 @@ sops:
     scenarios:
 
       - id: SOP-01-P01
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_check_fingerprints_from_subdirectory"]}
         polarity: positive
         title: 合格的场景文件通过核对并给出内容指纹
         actor: 方案作者
@@ -46,6 +48,7 @@ sops:
         evidence_hints: ["命令原文与完整输出", "运行前后演示仓库与状态目录的文件清单", "独立计算指纹的脚本及其输出"]
 
       - id: SOP-01-P02
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_entries_precedence_fallback_and_validation"]}
         polarity: positive
         title: 没有 entries.yaml 时使用 tw 配置中的入口，两处不一致时提示
         actor: 方案作者
@@ -59,6 +62,7 @@ sops:
         evidence_hints: ["两次命令的完整输出", "两份入口文件的内容"]
 
       - id: SOP-01-N01
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_input_errors_and_schema_lines"]}
         polarity: negative
         negative_type: incomplete-input
         title: 节点缺少反向场景时指出节点与行号
@@ -73,6 +77,7 @@ sops:
         evidence_hints: ["两次命令的完整输出"]
 
       - id: SOP-01-N02
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_input_errors_and_schema_lines"]}
         polarity: negative
         negative_type: invalid-input
         title: verify 引用未声明的入口时拒绝
@@ -87,6 +92,7 @@ sops:
         evidence_hints: ["完整输出"]
 
       - id: SOP-01-N03
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_yaml_unsupported_features_report_exact_lines"]}
         polarity: negative
         negative_type: invalid-input
         title: 超出 YAML 子集的写法报行号拒绝
@@ -110,6 +116,7 @@ sops:
     scenarios:
 
       - id: SOP-02-P01
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_pending_new_and_usage"]}
         polarity: positive
         title: 新批次全部待执行，全部通过后清单为空
         actor: 验收负责人
@@ -123,6 +130,7 @@ sops:
         evidence_hints: ["三次命令的完整输出", "状态目录文件清单"]
 
       - id: SOP-02-P02
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_pending_changed_failed_blocked_and_product_changes"]}
         polarity: positive
         title: 失败进入清单，受阻单列
         actor: 验收负责人
@@ -136,6 +144,7 @@ sops:
         evidence_hints: ["submit 与 pending 的完整输出"]
 
       - id: SOP-02-N01
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_pending_changed_failed_blocked_and_product_changes"]}
         polarity: negative
         negative_type: stale-input
         title: 修改一条场景的预期后只有它待执行
@@ -150,6 +159,7 @@ sops:
         evidence_hints: ["场景文件差异", "pending 的完整输出"]
 
       - id: SOP-02-N02
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_pending_changed_failed_blocked_and_product_changes"]}
         polarity: negative
         negative_type: stale-input
         title: 产品变化后按回归声明区分
@@ -173,6 +183,7 @@ sops:
     scenarios:
 
       - id: SOP-03-P01
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_submit_round_evidence_statistics_and_independence"]}
         polarity: positive
         title: 完整结果登记为一轮并保存证据
         actor: 执行者
@@ -186,6 +197,7 @@ sops:
         evidence_hints: ["命令原文与完整输出", "前后文件清单", "round.json 内容与证据 sha256 对照"]
 
       - id: SOP-03-P02
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_submit_round_evidence_statistics_and_independence"]}
         polarity: positive
         title: 独立性按事实标注，三种情况都登记
         actor: 执行者
@@ -199,6 +211,7 @@ sops:
         evidence_hints: ["三次 submit 与 report 的完整输出"]
 
       - id: SOP-03-N01
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_results_incomplete_and_invalid_line_numbers"]}
         polarity: negative
         negative_type: incomplete-input
         title: 缺少待执行场景的结果时拒绝
@@ -213,6 +226,7 @@ sops:
         evidence_hints: ["完整输出", "状态目录文件清单"]
 
       - id: SOP-03-N02
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_results_incomplete_and_invalid_line_numbers"]}
         polarity: negative
         negative_type: invalid-input
         title: 逐行指出结果文件的问题
@@ -227,6 +241,7 @@ sops:
         evidence_hints: ["完整输出", "状态目录文件清单"]
 
       - id: SOP-03-N03
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_state_invalid_paths_and_symlinks_before_writes", "sop-verify.scripts.test_sop.SopTests::test_state_invalid_directory_permissions_before_writes"]}
         polarity: negative
         negative_type: invalid-input
         title: 状态目录不可用时报 state-invalid 且不写文件
@@ -250,6 +265,7 @@ sops:
     scenarios:
 
       - id: SOP-04-P01
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_import_cases_union_and_preserved_yaml_fields"]}
         polarity: positive
         title: 导入测试岗格式的用例并按编号取并集
         actor: 方案作者
@@ -263,6 +279,7 @@ sops:
         evidence_hints: ["两次命令的完整输出", "并集快照与原文件的字段对照"]
 
       - id: SOP-04-P02
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_coverage_complete_snapshot"]}
         polarity: positive
         title: 每条用例恰好归一类时覆盖完整
         actor: 方案作者
@@ -276,6 +293,7 @@ sops:
         evidence_hints: ["完整输出", "配对文件"]
 
       - id: SOP-04-N01
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_coverage_missing_duplicate_conflict_and_unknown_scenario"]}
         polarity: negative
         negative_type: incomplete-input
         title: 遗漏、重复归类与冲突分别列出
@@ -290,6 +308,7 @@ sops:
         evidence_hints: ["完整输出", "配对文件"]
 
       - id: SOP-04-N02
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_coverage_missing_duplicate_conflict_and_unknown_scenario", "sop-verify.scripts.test_sop.SopTests::test_coverage_json_reference_errors_use_json_paths"]}
         polarity: negative
         negative_type: not-found
         title: 配对引用不存在的场景时点名
@@ -313,6 +332,7 @@ sops:
     scenarios:
 
       - id: SOP-05-P01
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_report_seven_sections_rates_latest_results_and_regression"]}
         polarity: positive
         title: 报告含全部区块与正确数值
         actor: 验收负责人
@@ -326,6 +346,7 @@ sops:
         evidence_hints: ["两次命令的完整输出", "运行前后的文件清单"]
 
       - id: SOP-05-N01
+        regression: {"check": "unit", "cases": ["sop-verify.scripts.test_sop.SopTests::test_report_without_rounds"]}
         polarity: negative
         negative_type: empty-input
         title: 尚无轮次时如实写无数据
@@ -349,6 +370,7 @@ sops:
     scenarios:
 
       - id: SOP-06-P01
+        regression: {"manual": "由只装候选技能的新会话按场景原话执行并复核会话记录", "owner": "AdolphKevin", "trigger": "技能文本或 sop.py 变化时"}
         polarity: positive
         title: 一句话从 SOP 走到报告
         actor: 业务仓库成员
@@ -362,6 +384,7 @@ sops:
         evidence_hints: ["两个会话的完整记录", "仓库差异", "状态目录清单", "报告原文"]
 
       - id: SOP-06-N01
+        regression: {"manual": "由只装候选技能的新会话按场景原话执行并复核会话记录", "owner": "AdolphKevin", "trigger": "技能文本或 sop.py 变化时"}
         polarity: negative
         negative_type: not-found
         title: 找不到 SOP 原文时先询问来源
@@ -376,6 +399,7 @@ sops:
         evidence_hints: ["会话记录", "仓库差异"]
 
       - id: SOP-06-N02
+        regression: {"manual": "由只装候选技能的新会话按场景原话执行并复核会话记录", "owner": "AdolphKevin", "trigger": "技能文本或 sop.py 变化时"}
         polarity: negative
         negative_type: other
         title: 使用者要求不派新会话时如实标注独立性
