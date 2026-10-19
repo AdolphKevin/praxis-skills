@@ -86,6 +86,13 @@ git add <文件路径>
 npx skills add https://github.com/AdolphKevin/praxis-skills --skill sop-verify
 ```
 
+在业务 Git 仓库中查看看板上的待处理事项（无需场景文件或写入令牌）：
+
+```bash
+python3 <已安装技能目录>/scripts/sop.py status
+python3 <已安装技能目录>/scripts/sop.py status --format json
+```
+
 ### `verify-backend-sop-db`
 
 把标准操作流程（SOP）或业务规则转换成可长期保留的后端数据库集成测试。测试需要经过真实的应用程序接口、gRPC 接口或服务入口，并使用与生产环境兼容的数据库验证结果。

@@ -33,6 +33,8 @@ def content_fingerprint(scenario):
 
 
 def render_text(result):
+    if 'items' in result:
+        return render_status(result)
     lines = list(result.get('warnings', []))
     if 'scenario_sha256' in result:
         lines.append('场景文件 sha256：' + result['scenario_sha256'])
@@ -70,12 +72,39 @@ def render_text(result):
     return '\n'.join(lines)
 
 
+def render_status(result):
+    if result['board'] is None:
+        return '未配置看板（SOP_BOARD_URL），没有看板上的待处理事项'
+    if result.get('warnings'):
+        return '\n'.join(result['warnings'])
+    if not result['items']:
+        return '看板上没有待开发者处理的事项'
+    titles = {'developer-action': '待开发者处理', 'developer-merge': '待开发者合入',
+              'commit-needed': '待提交', 'cases-needed': '待补充', 'sync-needed': '待同步',
+              'jira-manual': 'Jira 状态待人工更新', 'interrupted': '已中断'}
+    groups = {}
+    for item in result['items']:
+        groups.setdefault(item['kind'], []).append(item)
+    order = [kind for kind in titles if kind in groups] + [kind for kind in groups if kind not in titles]
+    lines = []
+    for kind in order:
+        lines.append(titles.get(kind, kind))
+        for item in groups[kind]:
+            lines.append(f"  批次：{item.get('batch') or '项目级'}；任务：{item['task']}")
+            lines.append('    原因：' + item['reason'])
+            lines.append('    看板：' + item['url'])
+            if item.get('resume'):
+                lines.append('    接续：' + item['resume'])
+    return '\n'.join(lines)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', help='Git 仓库路径；默认使用当前目录所在仓库')
     parser.add_argument('--format', choices=('text', 'json'), default='text')
     commands = parser.add_subparsers(dest='command', required=True)
     descriptions = [
+        ('status', '列出看板上待开发者处理的事项'),
         ('check', '核对场景文件与入口'), ('pending', '列出待执行场景'),
         ('submit', '登记结果并复制证据'), ('import-cases', '导入测试用例并保存并集'),
         ('coverage', '核对用例与场景的配对'), ('report', '输出验证报告'),
@@ -83,7 +112,8 @@ def main():
     ]
     for name, description in descriptions:
         command = commands.add_parser(name, help=description)
-        command.add_argument('scenario', help='场景文件；相对路径从仓库根目录解析')
+        if name != 'status':
+            command.add_argument('scenario', help='场景文件；相对路径从仓库根目录解析')
         if name == 'check':
             command.add_argument('--entries')
         if name == 'coverage':
@@ -103,6 +133,10 @@ def main():
     args = parser.parse_args()
     try:
         root = repository_root(args.root or '.')
+        if args.command == 'status':
+            result = (Board(root).status() if os.environ.get('SOP_BOARD_URL')
+                      else dict(ok=True, board=None, items=[]))
+            return output(args, result)
         path = (root / args.scenario).resolve()
         if not path.is_relative_to(root):
             raise Invalid('scenario-file-invalid', [problem('场景文件必须在仓库内')])

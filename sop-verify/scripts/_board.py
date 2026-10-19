@@ -43,7 +43,7 @@ def redact(value):
 
 
 class Board:
-    def __init__(self, root, batch):
+    def __init__(self, root, batch=''):
         self.root = root
         self.url = os.environ['SOP_BOARD_URL'].rstrip('/')
         self.identity = project_identity(root)
@@ -74,6 +74,8 @@ class Board:
             value = json.loads(raw.decode('utf-8'))
             if not isinstance(value, dict):
                 raise ValueError('JSON 响应必须是对象')
+        except (json.JSONDecodeError, UnicodeError) as error:
+            raise Invalid('board-unavailable', [problem(f'{address}：响应不是 JSON：{error}')]) from error
         except (URLError, OSError, ValueError) as error:
             raise Invalid('board-unavailable', [problem(f'{address}：{error}')]) from error
         if status >= 400 or value.get('ok') is False:
@@ -85,6 +87,14 @@ class Board:
                             for item in value.get('problems', []))
             raise Invalid('board-rejected', problems)
         return value
+
+    def status(self):
+        response = self.request('/api/v1/projects/' + quote(self.key, safe='') + '/attention',
+                                missing=('project-not-found',))
+        result = dict(ok=True, board=self.url, project=self.key, items=response['items'] if response else [])
+        if response is None:
+            result['warnings'] = ['看板上还没有项目 ' + self.key]
+        return result
 
     def pending(self, scenarios, fingerprints, source=None):
         response = self.request(self.api + '/scenarios', missing=('batch-not-found', 'project-not-found'))
