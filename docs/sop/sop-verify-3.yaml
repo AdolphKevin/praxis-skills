@@ -1,0 +1,265 @@
+# SOP-VERIFY-3：待开发者处理事项
+# 预期只依据 sop-board 仓库 docs/proposals/2026-10-19-standalone-sop-verification.md（v8）的 D28，本仓 docs/designs/SOP-VERIFY-3.md（修订 1）的 scope-global、I1 与 D1，
+# 本仓 docs/designs/SOP-VERIFY-2.md（修订 2）I1 的项目身份与错误代码，以及 sop-board 仓库 docs/designs/SOP-BOARD-5.md I8 的“待开发者处理的事项”接口；不依据当前实现的输出。
+# 版本 1（2026-10-20）：Claude 依据上述原文编写，经 AdolphKevin 授权由 Claude 代批。
+#
+# 共用定义：
+# “候选脚本”指本仓候选版 sop-verify/scripts/sop.py，以 python3 <候选脚本> <子命令> 运行；“状态目录”指 XDG_STATE_HOME 指向的空临时目录（SOP_VERIFY_STATE 未设置）。
+# “演示仓库”指执行者新建的临时 Git 仓库：根目录名 demo-app，origin 为 https://github.com/demo-org/demo-app.git（项目身份 github.com/demo-org/demo-app，项目键 github-com-demo-org-demo-app），
+# git config user.name 为 Alice Dev；已提交 app.txt、docs/sop/entries.yaml（只声明 cli 入口）与合格场景文件 docs/sop/demo.yaml（批次 demo）；没有 .tw/，工作区干净。
+# “模拟看板”指执行者用标准库 http.server 写的服务：对 GET /api/v1/projects/<项目键>/attention 返回场景预设的响应（缺省为 200 与 {ok: true, items: []}），
+# 对其他路径返回 404；记下每个请求的方法、路径与查询串、请求头与正文。“看板地址”指模拟看板的 http://127.0.0.1:<端口>。
+# “八项事项”指模拟看板按下列顺序返回的 items，每项为 {kind, task, batch, reason, url, resume}：
+# 1 developer-action、12、demo、方案待开发者批准、http://board.example.test/p/github-com-demo-org-demo-app/fixes?task=12、codex resume sess-12；
+# 2 commit-needed、13、demo、工作区有未提交的产品改动、http://board.example.test/p/github-com-demo-org-demo-app/b/demo/runs?task=13、空字符串；
+# 3 developer-merge、14、demo、基线已前进且合入有冲突、http://board.example.test/p/github-com-demo-org-demo-app/fixes?task=14、codex resume sess-14；
+# 4 cases-needed、15、refund、用例 TC_REFUND_FLOW_003 缺少预期结果、http://board.example.test/p/github-com-demo-org-demo-app/b/refund/merges?task=15、空字符串；
+# 5 sync-needed、16、refund、合并结果待取回仓库、http://board.example.test/p/github-com-demo-org-demo-app/b/refund/merges?task=16、空字符串；
+# 6 jira-manual、17、demo、Jira 单 DEMO-7 流转失败、http://board.example.test/p/github-com-demo-org-demo-app/fixes?task=17、空字符串；
+# 7 interrupted、18、demo、看板重启时会话中断、http://board.example.test/p/github-com-demo-org-demo-app/fixes?task=18、codex resume sess-18；
+# 8 developer-action、19、refund、连续三次尝试未通过、http://board.example.test/p/github-com-demo-org-demo-app/fixes?task=19、codex resume sess-19。
+# “技能会话”指只装候选 sop-verify 技能的新会话，在演示仓库中按场景原话执行；会话询问时由执行者以开发者身份答复。
+
+metadata:
+  requirement: "sop-verify 待开发者处理事项：status 子命令列出看板上本仓库待开发者处理的事项，技能先报告这些事项"
+  batch: "sop-verify-3"
+  version: 1
+  owner: "AdolphKevin"
+  sources:
+    - ref: "AdolphKevin/sop-board docs/proposals/2026-10-19-standalone-sop-verification.md 的 D28"
+      version: "v8（2026-10-19）"
+      confirmed_by: "AdolphKevin"
+    - ref: "docs/designs/SOP-VERIFY-3.md 的 scope-global、I1、D1 节"
+      version: "修订 1"
+      confirmed_by: "AdolphKevin"
+  tags: ["sop-verify", "看板模式", "待开发者处理"]
+
+sops:
+
+  - id: SOP-31
+    title: "status 子命令"
+    actor: "开发者"
+    entry: "sop.py status [--format text|json]"
+    scenarios:
+
+      - id: SOP-31-P01
+        polarity: positive
+        title: "未配置看板时 status 说明未配置看板，退出码 0，不发出请求"
+        actor: "开发者"
+        priority: P0
+        refs: ["I1"]
+        verify: cli
+        initial_state: ["演示仓库", "模拟看板在本机运行，八项事项为其预设响应", "SOP_BOARD_URL 未设置，SOP_BOARD_TOKEN 未设置"]
+        steps: ["在仓库根目录运行 python3 <候选脚本> status", "运行 python3 <候选脚本> status --format json", "把 SOP_BOARD_URL 设为空字符串，再依次运行上面两条命令", "查看模拟看板的请求记录、状态目录文件清单与 git status --porcelain"]
+        expected: ["四次退出码均为 0", "两次 text 输出为“未配置看板（SOP_BOARD_URL），没有看板上的待处理事项”", "两次 json 输出为 {ok: true, board: null, items: []}", "模拟看板没有收到任何请求"]
+        forbidden_effects: ["输出中出现八项事项的任何内容", "状态目录或演示仓库出现新文件"]
+        evidence_hints: ["四次命令原文、退出码与完整输出", "模拟看板的请求记录", "状态目录文件清单与 git status"]
+
+      - id: SOP-31-P02
+        polarity: positive
+        title: "text 输出按种类分组列出七种事项的中文名、批次、任务编号、原因、看板链接，有会话时附接续命令"
+        actor: "开发者"
+        priority: P0
+        refs: ["I1"]
+        verify: cli
+        initial_state: ["演示仓库", "模拟看板对 attention 返回 200 与 {ok: true, items: <八项事项>}", "SOP_BOARD_URL 为看板地址，SOP_BOARD_TOKEN 未设置"]
+        steps: ["运行 python3 <候选脚本> status", "逐项对照输出与八项事项"]
+        expected: ["退出码为 0", "七种事项的中文名依次对应：developer-action 为 待开发者处理，developer-merge 为 待开发者合入，commit-needed 为 待提交，cases-needed 为 待补充，sync-needed 为 待同步，jira-manual 为 Jira 状态待人工更新，interrupted 为 已中断", "每个种类只出现一组，任务 12 与任务 19 列在同一个“待开发者处理”分组中", "八项都出现，每项含其批次、任务编号、原因与看板链接，与模拟看板返回的值相同", "任务 12、14、18、19 各附一行“接续：codex resume sess-<任务编号>”", "任务 13、15、16、17 没有“接续：”一行"]
+        forbidden_effects: ["输出英文种类代码代替中文名", "遗漏或重复任何一项", "把 resume 为空字符串的事项输出为“接续：”加空命令"]
+        evidence_hints: ["命令原文与完整输出", "模拟看板的预设响应"]
+
+      - id: SOP-31-P03
+        polarity: positive
+        title: "json 输出含看板地址、项目键与看板返回的原样各项，请求为一次 GET attention"
+        actor: "开发者"
+        priority: P0
+        refs: ["I1"]
+        verify: cli
+        initial_state: ["演示仓库", "模拟看板对 attention 返回 200 与 {ok: true, items: <八项事项>}", "SOP_BOARD_URL 为看板地址加末尾斜杠，如 http://127.0.0.1:<端口>/；SOP_BOARD_TOKEN 未设置"]
+        steps: ["运行 python3 <候选脚本> status --format json", "解析输出，与模拟看板的预设 items 逐项比较", "查看模拟看板的请求记录"]
+        expected: ["退出码为 0", "json 的 ok 为 true，board 为去掉末尾斜杠的看板地址 http://127.0.0.1:<端口>，project 为 github-com-demo-org-demo-app", "items 与模拟看板返回的 items 相等：顺序相同，每项的 kind、task、batch、reason、url、resume 与原值相同，resume 为空字符串的项仍为空字符串", "模拟看板只收到一个请求：GET /api/v1/projects/github-com-demo-org-demo-app/attention，路径中没有双斜杠"]
+        forbidden_effects: ["items 中的 kind 被改写为中文名或字段被增删", "向看板发出 GET 以外的请求"]
+        evidence_hints: ["命令原文与完整输出", "输出与预设 items 的比较脚本及结果", "模拟看板的请求记录"]
+
+      - id: SOP-31-P04
+        polarity: positive
+        title: "看板上没有事项时 text 说明没有待开发者处理的事项，json 的 items 为空"
+        actor: "开发者"
+        priority: P0
+        refs: ["I1"]
+        verify: cli
+        initial_state: ["演示仓库", "模拟看板对 attention 返回 200 与 {ok: true, items: []}", "SOP_BOARD_URL 为看板地址，SOP_BOARD_TOKEN 未设置"]
+        steps: ["运行 python3 <候选脚本> status", "运行 python3 <候选脚本> status --format json"]
+        expected: ["两次退出码均为 0", "text 输出“看板上没有待开发者处理的事项”", "json 为 {ok: true, board: <看板地址>, project: github-com-demo-org-demo-app, items: []}"]
+        forbidden_effects: ["text 输出“未配置看板”的说明", "输出空的种类分组"]
+        evidence_hints: ["两次命令原文与完整输出"]
+
+      - id: SOP-31-P05
+        polarity: positive
+        title: "项目键按 origin 规范化计算，SOP_BOARD_PROJECT 有值时以它为准"
+        actor: "开发者"
+        priority: P1
+        refs: ["I1"]
+        verify: cli
+        initial_state: ["演示仓库，origin 改为 git@github.com:Demo-Org/demo-app.git", "模拟看板对任何项目键的 attention 都返回 200 与 {ok: true, items: []}", "SOP_BOARD_URL 为看板地址"]
+        steps: ["SOP_BOARD_PROJECT 未设置，运行 python3 <候选脚本> status --format json", "SOP_BOARD_PROJECT 设为 https://GitLab.Example.com/Team/Other-App.git，再运行一次", "查看模拟看板的请求记录"]
+        expected: ["两次退出码均为 0", "第一次 project 为 github-com-demo-org-demo-app，请求路径为 /api/v1/projects/github-com-demo-org-demo-app/attention", "第二次 project 为 gitlab-example-com-team-other-app，请求路径为 /api/v1/projects/gitlab-example-com-team-other-app/attention"]
+        forbidden_effects: ["第二次仍按 origin 计算项目键"]
+        evidence_hints: ["两次命令原文与完整输出", "模拟看板的请求记录"]
+
+      - id: SOP-31-P06
+        polarity: positive
+        title: "status 不写任何文件，不需要写入令牌，设置了令牌时令牌不出现在输出中"
+        actor: "开发者"
+        priority: P1
+        refs: ["I1"]
+        verify: cli
+        initial_state: ["演示仓库，状态目录为空", "模拟看板对 attention 返回 200 与 {ok: true, items: <八项事项>}", "SOP_BOARD_URL 为看板地址"]
+        steps: ["记录演示仓库的 git status --porcelain、全部文件清单与状态目录文件清单", "SOP_BOARD_TOKEN 未设置，运行 status 与 status --format json", "SOP_BOARD_TOKEN 设为 tok-secret-031，再运行 status 与 status --format json", "再次记录 git status、文件清单与状态目录文件清单"]
+        expected: ["四次退出码均为 0，令牌未设置时两次输出均列出八项事项", "四次输出中都不含 tok-secret-031", "前后的 git status、仓库文件清单与状态目录文件清单相同，状态目录仍为空"]
+        forbidden_effects: ["令牌未设置时报 board-token-missing", "status 在状态目录、仓库或其他位置写入文件"]
+        evidence_hints: ["四次命令原文与完整输出", "前后的 git status 与两份文件清单"]
+
+      - id: SOP-31-N01
+        polarity: negative
+        negative_type: not-found
+        title: "项目在看板上不存在时退出码 0，说明看板上还没有该项目，items 为空"
+        actor: "开发者"
+        priority: P0
+        refs: ["I1"]
+        verify: cli
+        initial_state: ["演示仓库", "模拟看板对 attention 返回 404 与 {ok: false, error_code: project-not-found, problems: [项目不存在]}", "SOP_BOARD_URL 为看板地址"]
+        steps: ["运行 python3 <候选脚本> status", "运行 python3 <候选脚本> status --format json"]
+        expected: ["两次退出码均为 0", "text 输出说明看板上还没有项目 github-com-demo-org-demo-app 或该项目", "json 的 ok 为 true，items 为 []"]
+        forbidden_effects: ["报 board-rejected 或退出码 1", "输出中列出任何事项"]
+        evidence_hints: ["两次命令原文、退出码与完整输出"]
+
+      - id: SOP-31-N02
+        polarity: negative
+        negative_type: disconnect
+        title: "看板不可达时报 board-unavailable，退出码 1，写明地址与原因"
+        actor: "开发者"
+        priority: P0
+        refs: ["I1"]
+        verify: cli
+        initial_state: ["演示仓库", "SOP_BOARD_URL 为 http://127.0.0.1:<没有进程监听的端口>"]
+        steps: ["运行 python3 <候选脚本> status", "运行 python3 <候选脚本> status --format json", "运行 git status --porcelain"]
+        expected: ["两次退出码均为 1", "text 输出含错误代码 board-unavailable", "json 的 ok 为 false，error_code 为 board-unavailable", "两次输出都写明所访问的看板地址与连接失败的原因"]
+        forbidden_effects: ["输出“未配置看板”或“看板上没有待开发者处理的事项”", "退出码 0"]
+        evidence_hints: ["两次命令原文、退出码与完整输出"]
+
+      - id: SOP-31-N03
+        polarity: negative
+        negative_type: timeout
+        title: "看板 30 秒不响应或返回非 JSON 时报 board-unavailable"
+        actor: "开发者"
+        priority: P1
+        refs: ["I1"]
+        verify: cli
+        initial_state: ["演示仓库", "模拟看板 A：收到 attention 请求后 40 秒才响应", "模拟看板 B：对 attention 返回 200 与一段 HTML 正文"]
+        steps: ["SOP_BOARD_URL 指向 A，运行 python3 <候选脚本> status --format json 并计时", "SOP_BOARD_URL 指向 B，运行 python3 <候选脚本> status --format json"]
+        expected: ["两次退出码均为 1，error_code 均为 board-unavailable", "第一次在约 30 秒时结束，原因写明超时", "第二次的原因写明响应不是 JSON", "两次都写明所访问的看板地址"]
+        forbidden_effects: ["把非 JSON 正文当作没有事项并退出码 0", "等待超过 40 秒"]
+        evidence_hints: ["两次命令原文、耗时与完整输出"]
+
+      - id: SOP-31-N04
+        polarity: negative
+        negative_type: other
+        title: "看板返回其他失败响应时报 board-rejected 并转述看板错误代码"
+        actor: "开发者"
+        priority: P1
+        refs: ["I1"]
+        verify: cli
+        initial_state: ["演示仓库，SOP_BOARD_URL 为模拟看板地址", "模拟看板对 attention 依次返回：第一次 500 与 {ok: false, error_code: internal-error, problems: [{field: items, problem: 读取失败}]}；第二次 404 与 {ok: false, error_code: batch-not-found, problems: []}"]
+        steps: ["运行 python3 <候选脚本> status --format json", "再运行一次 python3 <候选脚本> status --format json"]
+        expected: ["两次退出码均为 1，error_code 均为 board-rejected", "第一次 problems 第一项为“看板错误代码 internal-error”，第二项为 {line: null, problem: “items：读取失败”}", "第二次 problems 第一项为“看板错误代码 batch-not-found”"]
+        forbidden_effects: ["第二次按项目不存在处理并退出码 0"]
+        evidence_hints: ["两次命令原文与完整输出", "模拟看板的预设响应"]
+
+      - id: SOP-31-N05
+        polarity: negative
+        negative_type: incomplete-input
+        title: "设置了看板而没有 origin 与 SOP_BOARD_PROJECT 时报 project-identity-missing 且不发请求"
+        actor: "开发者"
+        priority: P2
+        refs: ["I1"]
+        verify: cli
+        initial_state: ["与演示仓库结构相同而没有任何 remote 的临时仓库", "SOP_BOARD_URL 为模拟看板地址，SOP_BOARD_PROJECT 未设置"]
+        steps: ["运行 python3 <候选脚本> status --format json", "查看模拟看板的请求记录"]
+        expected: ["退出码为 1，ok 为 false，error_code 为 project-identity-missing", "模拟看板没有收到任何请求"]
+        forbidden_effects: ["以仓库根目录名或其他值猜测项目身份并发出请求"]
+        evidence_hints: ["命令原文与完整输出", "模拟看板的请求记录"]
+
+  - id: SOP-32
+    title: "先报告待处理事项"
+    actor: "开发者"
+    entry: "sop-verify 技能"
+    scenarios:
+
+      - id: SOP-32-P01
+        polarity: positive
+        title: "设置了看板且有事项时，会话先运行 status、逐项报告并询问是否先处理，再继续本次请求"
+        actor: "开发者"
+        priority: P0
+        refs: ["D1"]
+        verify: skill
+        initial_state: ["技能会话；SOP_BOARD_URL 为模拟看板地址，SOP_BOARD_TOKEN 未设置", "演示仓库", "模拟看板对 attention 返回 200 与 {ok: true, items: [八项事项中的第 1、2、7 项]}"]
+        steps: ["对会话说：用 sop-verify 检查 docs/sop/demo.yaml 是否合格", "会话询问是否先处理这些事项时答复：先不处理，继续检查", "查看会话记录、运行的命令与模拟看板的请求记录"]
+        expected: ["会话运行的第一条 sop.py 命令是 status，早于 check", "会话在继续请求之前向开发者逐项报告三项事项，每项含种类（待开发者处理、待提交、已中断）、原因与看板链接，任务 12 与 18 附接续命令 codex resume sess-12 与 codex resume sess-18", "报告之后会话询问开发者是否先处理这些事项，得到答复后才运行 check", "会话运行 check docs/sop/demo.yaml 并报告结果"]
+        forbidden_effects: ["会话不经开发者同意运行 codex resume 或向看板发出写入请求", "会话略去某项事项或省略其链接"]
+        evidence_hints: ["会话记录", "命令记录及先后顺序", "模拟看板的请求记录"]
+
+      - id: SOP-32-P02
+        polarity: positive
+        title: "SKILL.md 的对话流程开头有先运行 status 的一步，命令表含 status"
+        actor: "维护者"
+        priority: P1
+        refs: ["D1"]
+        verify: skill
+        initial_state: ["候选版 sop-verify/SKILL.md"]
+        steps: ["阅读候选 SKILL.md 的对话流程与命令表"]
+        expected: ["对话流程的第一步写明：设置了 SOP_BOARD_URL 时先运行 status，有事项时逐项报告种类、原因、链接与接续命令，询问是否先处理，再继续本次请求；没有事项时不报告", "命令表含 status 一行"]
+        forbidden_effects: ["写成看板向会话推送消息"]
+        evidence_hints: ["SKILL.md 相关段落原文"]
+
+      - id: SOP-32-N01
+        polarity: negative
+        negative_type: empty-input
+        title: "看板上没有事项时会话不报告事项也不询问，直接处理本次请求"
+        actor: "开发者"
+        priority: P0
+        refs: ["D1"]
+        verify: skill
+        initial_state: ["技能会话；SOP_BOARD_URL 为模拟看板地址", "演示仓库", "模拟看板对 attention 返回 200 与 {ok: true, items: []}"]
+        steps: ["对会话说：用 sop-verify 检查 docs/sop/demo.yaml 是否合格", "查看会话记录、运行的命令与模拟看板的请求记录"]
+        expected: ["会话在 check 之前运行了 status，模拟看板收到 GET /api/v1/projects/github-com-demo-org-demo-app/attention", "会话直接运行 check 并报告结果"]
+        forbidden_effects: ["会话向开发者报告待处理事项或说明“没有待处理事项”", "会话询问是否先处理事项"]
+        evidence_hints: ["会话记录", "命令记录", "模拟看板的请求记录"]
+
+      - id: SOP-32-N02
+        polarity: negative
+        negative_type: not-found
+        title: "项目在看板上不存在时会话不报告事项"
+        actor: "开发者"
+        priority: P2
+        refs: ["D1", "I1"]
+        verify: skill
+        initial_state: ["技能会话；SOP_BOARD_URL 为模拟看板地址", "演示仓库", "模拟看板对 attention 返回 404 与 {ok: false, error_code: project-not-found, problems: [项目不存在]}"]
+        steps: ["对会话说：用 sop-verify 检查 docs/sop/demo.yaml 是否合格", "查看会话记录与运行的命令"]
+        expected: ["会话运行 status 后直接运行 check 并报告结果"]
+        forbidden_effects: ["会话把项目不存在报告为待处理事项或错误", "会话询问是否先处理事项"]
+        evidence_hints: ["会话记录", "命令记录"]
+
+      - id: SOP-32-N03
+        polarity: negative
+        negative_type: other
+        title: "未配置看板时会话不报告待处理事项"
+        actor: "开发者"
+        priority: P1
+        refs: ["D1"]
+        verify: skill
+        initial_state: ["技能会话；SOP_BOARD_URL 未设置", "演示仓库", "模拟看板在本机运行，对 attention 返回 200 与 {ok: true, items: <八项事项>}"]
+        steps: ["对会话说：用 sop-verify 检查 docs/sop/demo.yaml 是否合格", "查看会话记录、运行的命令与模拟看板的请求记录"]
+        expected: ["会话运行 check 并报告结果", "模拟看板没有收到任何请求"]
+        forbidden_effects: ["会话向开发者报告待处理事项或“未配置看板”的说明", "会话询问是否先处理事项", "会话要求开发者设置 SOP_BOARD_URL"]
+        evidence_hints: ["会话记录", "命令记录", "模拟看板的请求记录"]
