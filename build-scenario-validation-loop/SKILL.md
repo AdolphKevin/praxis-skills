@@ -170,3 +170,7 @@ State which mode and validation shape were used, which local contracts governed 
 created or run, where the immutable evidence and review live, both final statuses, and any remaining
 gap. For Author mode, also state the accepted and proposed case counts and list unresolved business
 decisions. For setup work, include the focused smoke command that proves the loop end to end.
+
+## 按场景结果输出
+
+调用方给出场景文件与待执行清单时，执行后在调用方指定的仓库外目录写 `results.jsonl`，每条场景一行，覆盖全部待执行项。字段遵循[结果文件格式](../sop-verify/references/formats.md#结果文件)（SOP-VERIFY-1 D1）：按事实填写 `scenario`、`status`、`actual`、`evidence`、`executed_at`、`executor`，会话身份按该格式记录；`blocked`、`skip` 写明非空 `finding`。证据逐个列为相对该结果目录的文件路径，实际文件保存在目录内。交回结果文件与证据，说明可由 `sop-verify submit`（技能内的 `sop.py submit`）或 `tw team scenarios submit` 登记。

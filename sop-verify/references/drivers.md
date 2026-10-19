@@ -13,7 +13,17 @@
 | `CASES`、`PAIRS`、`RESULTS` | `WORK` 中的用例文件、配对文件、结果文件 |
 | `IMPLEMENTER` | 被测代码的实际实现者姓名或会话标识 |
 
-相对文件参数按仓库根目录解析；本指南统一使用 `--root` 与绝对路径。执行会话使用本机默认状态配置，按[本机状态目录](formats.md#本机记录与报告)的缺省位置登记和复测；命令直接以 `python3` 开头。以下命令的输出由调用方保存在 `WORK`。
+相对文件参数按仓库根目录解析；本指南统一使用 `--root` 与绝对路径。执行会话沿用发起者的状态配置，缺省位置见[本机状态目录](formats.md#本机记录与报告)；命令直接以 `python3` 开头。以下命令的输出由调用方保存在 `WORK`。设置了 `SOP_BOARD_URL` 时先读[看板模式](board.md)，按其中的上传、取回与推送规则执行。
+
+| 子命令 | 用途 |
+| --- | --- |
+| `check` | 核对场景、入口与检查声明 |
+| `import-cases` | 导入用例；看板模式下同时上传 |
+| `pull` | 取回看板的合并场景，可同时下载配对文件；参数与命令见[上传与取回](board.md#上传与取回) |
+| `coverage` | 在本机核对用例并集与场景配对 |
+| `pending` | 读取待执行、回归守护与受阻清单 |
+| `submit` | 登记结果；看板模式下推送场景、入口、SOP、证据与轮次 |
+| `report` | 输出本机或看板报告 |
 
 确认场景后核对文件与入口：
 
@@ -52,7 +62,7 @@ python3 "$SOP_PY" --root "$REPO" report "$SCENARIOS" --format json
 
 ### 清单与登记
 
-`pending` 按当前内容指纹判断，JSON 分为 `pending`、`guarded`、`blocked` 三组：
+`pending` 的 JSON 分为 `pending`、`guarded`、`blocked` 三组。本机模式按当前内容指纹判断如下；看板模式的结果来源与差异见[推送、读取与授权](board.md#推送读取与授权)。
 
 | 原因或类别 | 条件与后续动作 |
 | --- | --- |
@@ -67,8 +77,8 @@ python3 "$SOP_PY" --root "$REPO" report "$SCENARIOS" --format json
 
 | 错误代码 | 处理 |
 | --- | --- |
-| `scenario-file-invalid` | 按行号修正场景结构、正反向覆盖或入口引用 |
-| `entries-invalid` | 补齐有效入口声明 |
+| `scenario-file-invalid` | 按行号修正场景结构、正反向覆盖、入口引用或未声明的 `regression.check` |
+| `entries-invalid` | 补齐有效入口与检查声明 |
 | `scenario-results-invalid` | 按行号补齐结果、真实时间和可读取的证据；空文件至少填写一条结果 |
 | `scenario-results-incomplete` | 补齐列出的待执行场景结果 |
 | `source-stale` | 仅用于登记前后场景 SHA-256 或产品指纹不一致，按当前版本重新准备本轮 |

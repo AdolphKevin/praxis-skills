@@ -1,7 +1,7 @@
 ---
 title: "sop-verify 在仓库外保存轮次，格式与 team-workflow 同义、各自实现"
 scope: ["self:sop-verify/**"]
-source: ["self:docs/designs/SOP-VERIFY-1.md", "AdolphKevin/team-workflow:docs/proposals/2026-10-19-standalone-sop-verification.md"]
+source: ["self:docs/designs/SOP-VERIFY-1.md", "AdolphKevin/sop-board:docs/proposals/2026-10-19-standalone-sop-verification.md"]
 status: "accepted"
 tags: ["sop-verify", "SOP 验证", "场景验收", "本机状态", "错误代码", "独立执行", "会话标识"]
 ---

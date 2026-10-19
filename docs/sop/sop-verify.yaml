@@ -14,7 +14,7 @@ metadata:
   version: 2
   owner: "AdolphKevin"
   sources:
-    - ref: "AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 2、3、4 节"
+    - ref: "AdolphKevin/sop-board docs/proposals/2026-10-19-standalone-sop-verification.md 第 2、3、4 节"
       version: "v7（2026-10-19）"
       confirmed_by: "AdolphKevin"
     - ref: "docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节与任务 T2"

@@ -102,7 +102,7 @@ roles: {"design_owner":"Claude","implementation_owner":"Codex","acceptance_owner
 SOP-01 节点全部场景通过。
 
 - 场景：docs/sop/sop-verify.yaml#SOP-01
-- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 2；确认人 AdolphKevin
+- 依据：位置 AdolphKevin/sop-board docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 2；确认人 AdolphKevin
 - 检查：unit
 - 验证：自动
 
@@ -111,7 +111,7 @@ SOP-01 节点全部场景通过。
 SOP-02 节点全部场景通过。
 
 - 场景：docs/sop/sop-verify.yaml#SOP-02
-- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 2；确认人 AdolphKevin
+- 依据：位置 AdolphKevin/sop-board docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 2；确认人 AdolphKevin
 - 检查：unit
 - 验证：自动
 
@@ -120,7 +120,7 @@ SOP-02 节点全部场景通过。
 SOP-03 节点全部场景通过。
 
 - 场景：docs/sop/sop-verify.yaml#SOP-03
-- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 2；确认人 AdolphKevin
+- 依据：位置 AdolphKevin/sop-board docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 2；确认人 AdolphKevin
 - 检查：unit
 - 验证：自动
 
@@ -129,7 +129,7 @@ SOP-03 节点全部场景通过。
 SOP-04 节点全部场景通过。
 
 - 场景：docs/sop/sop-verify.yaml#SOP-04
-- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 2；确认人 AdolphKevin
+- 依据：位置 AdolphKevin/sop-board docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 2；确认人 AdolphKevin
 - 检查：unit
 - 验证：自动
 
@@ -138,7 +138,7 @@ SOP-04 节点全部场景通过。
 SOP-05 节点全部场景通过。
 
 - 场景：docs/sop/sop-verify.yaml#SOP-05
-- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 2；确认人 AdolphKevin
+- 依据：位置 AdolphKevin/sop-board docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 节；版本 修订 2；确认人 AdolphKevin
 - 检查：unit
 - 验证：自动
 
@@ -147,7 +147,7 @@ SOP-05 节点全部场景通过。
 SOP-06 节点全部场景通过。技能场景由只装候选技能的新会话执行，没有自动检查。
 
 - 场景：docs/sop/sop-verify.yaml#SOP-06
-- 依据：位置 AdolphKevin/team-workflow docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节与 D10；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的任务 T2；版本 修订 2；确认人 AdolphKevin
+- 依据：位置 AdolphKevin/sop-board docs/proposals/2026-10-19-standalone-sop-verification.md 第 3、4 节与 D10；版本 v7（2026-10-19）；确认人 AdolphKevin / 位置 docs/designs/SOP-VERIFY-1.md 的任务 T2；版本 修订 2；确认人 AdolphKevin
 - 检查：无
 
 ## 任务 T1：sop.py 与测试

@@ -21,7 +21,7 @@
 
 | 结构 | 含义与要求 |
 | --- | --- |
-| `{check: unit, cases: [TestRefund::test_empty]}` | 已有自动检查；`check` 为非空字符串，`cases` 至少一项 |
+| `{check: unit, cases: [TestRefund::test_empty]}` | 已有自动检查；`check` 引用所用入口声明的 `checks` 中的检查编号，`cases` 至少一项 |
 | `{manual: 核对终端提示, owner: 验收负责人, trigger: 发布前}` | 人工回归方法、负责人、触发时机，均为非空字符串 |
 | `{pending: Q-AUTO-1}` | 待建设回归的跟进事项，值为非空字符串 |
 
@@ -95,9 +95,27 @@ fingerprint = hashlib.sha256(payload.encode("utf-8")).hexdigest()
 | `operate` | 非空字符串，说明实际操作 |
 | `observe`、`evidence` | 非空字符串数组，分别写观察点与证据要求 |
 | `isolation` | 非空字符串，说明隔离方式 |
-| `address_env` | 可选，保存入口地址的环境变量名 |
+| `address_env` | 可选，保存入口地址的环境变量名；`candidate: start` 时必填 |
+| `candidate` | 可选，候选版本的准备方式：`checkout` 在独立检出目录执行，`start` 启动候选服务，`in-place` 在当前环境执行；缺省 `in-place` |
+| `start` | 可选，启动命令的非空字符串数组，逐项填写程序与参数；`candidate: start` 时必填 |
+| `reload` | 可选，重新加载命令的非空字符串数组 |
 
-来源优先级为 `check --entries` 指定的文件、场景同目录的 `entries.yaml`、仓库 `.tw/config.json` 的 `acceptance_entries`。从配置读取时只取表中六个字段。两处同时存在时采用 `entries.yaml`，同名且内容不同的入口作为提示列出。
+声明准备方式后，由执行者或已获授权的看板按命令准备环境；`sop.py` 核对声明格式。
+
+顶层可选 `checks`，把检查编号映射到检查对象：
+
+| 字段 | 要求 |
+| --- | --- |
+| `argv` | 必填，实际检查命令的非空字符串数组 |
+| `cwd` | 可选，工作目录字符串，缺省 `.` |
+| `timeout` | 必填，超时秒数，正整数 |
+| `format` | 必填，`junit` 或 `go-json` |
+| `report` | `format: junit` 时必填，非空报告路径字符串 |
+| `required_env` | 可选，所需环境变量名的字符串数组，可为空 |
+
+来自 tw 的 `purpose`、`required_cases`、`environment`、`coverage`、`artifacts`、`review`、`repository`、`revision_sensitive` 字段原样接受而不使用。`regression.check` 引用的编号必须已声明；缺失时 `check`、`pending`、`submit` 报 `scenario-file-invalid` 并给出行号。入口或检查声明不合格报 `entries-invalid` 并给出行号。
+
+入口与检查共同按同一来源顺序选择：`check --entries` 指定的文件、场景同目录的 `entries.yaml`、仓库 `.tw/config.json` 的 `acceptance_entries` 与 `checks`。从 tw 配置中选择上述支持字段。两处同时存在时全部采用 `entries.yaml`；同名且内容不同的入口或检查作为提示列出。
 
 示例 `docs/sop/entries.yaml`：
 
@@ -137,6 +155,8 @@ JSON Lines 文件至少填写一条结果，每行一个对象，同一文件每
 ## 测试同事的用例文件
 
 采用 JSON 或 YAML，顶层为 `test_cases` 或 `cases` 数组。每项必填非空字符串 `id`、`title`，其余字段原样保存；同一文件编号唯一。多次导入按编号取最后一次的完整内容，覆盖要求针对历次导入的并集。
+
+看板模式上传采用 SOP-BOARD-2 I3 的更严格结构：顶层为 `metadata`、`test_cases`；`metadata` 必填非空 `module`、`feature`、`owner` 与有效日期 `last_reviewed`（`YYYY-MM-DD`），可选字符串数组 `tags`。用例编号匹配 `^TC_[A-Z0-9_]{3,}_[0-9]{3}$`，还必填 `priority`（`P0`、`P1`、`P2`）、`type`（`functional`、`ui`、`security`、`performance`、`accessibility`）、非空字符串数组 `steps`、`expected_results`、`tags`；可选 `description` 字符串、`preconditions` 字符串数组、`auto` 布尔值。看板只接受这些字段。下面的简例用于本机模式，上传前按此结构补齐。
 
 ```yaml
 metadata: {owner: 测试同事}
@@ -193,7 +213,7 @@ test_cases:
 - `cases/`：每次导入的快照与当前并集。
 - `coverage/`：配对快照与结论。
 
-脚本的所有子命令保持业务仓库文件不变。产品指纹覆盖 Git 跟踪文件与未被忽略的未跟踪文件，排除 `docs/sop/`、当前场景文件和所用入口文件；按路径排序后汇总内容哈希，已删除的跟踪文件记为删除。轮次同时记录 HEAD 与工作区的 `dirty` 状态。
+`pull` 按[看板规则](board.md#上传与取回)写回场景，其余子命令保持业务仓库文件不变。看板模式的轮次与证据保存在看板，本机仅保留批次绑定、用例及配对快照，详见[推送与读取](board.md#推送读取与授权)。产品指纹覆盖 Git 跟踪文件与未被忽略的未跟踪文件，排除 `docs/sop/`、当前场景文件和所用入口文件；按路径排序后汇总内容哈希，已删除的跟踪文件记为删除。轮次同时记录 HEAD 与工作区的 `dirty` 状态。
 
 轮次记录包含 `data_version: 1`、`kind: sop-round`、批次、场景路径与 SHA-256、轮次、产品指纹、提交号、`dirty`、`implementer`、`submitted_at`、结果及统计。每条结果附内容指纹、独立性、证据路径与 SHA-256。
 
