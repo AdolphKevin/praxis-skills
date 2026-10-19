@@ -11,6 +11,7 @@ Praxis Skills 收录从真实软件项目中沉淀的可复用工程 Skill。每
 | [`build-scenario-validation-loop`](#build-scenario-validation-loop) | 为人工智能服务建立基于场景、证据和独立审核的质量验证闭环 | 智能代理、带状态的人工智能服务、方案对比评测 |
 | [`business-flow-mapper`](#business-flow-mapper) | 从代码和文档中还原业务处理流程，生成中文 Mermaid 流程图 | 梳理业务链路、解释系统行为、定位流程分支 |
 | [`git-commit`](#git-commit) | 根据暂存区中的实际改动生成规范提交 | 整理提交说明、评估改动风险、创建 Git 提交 |
+| [`sop-verify`](#sop-verify) | 从业务 SOP 编写经确认的正反向场景，保存执行证据并生成本机报告 | 验证 SOP、SOP 验收、业务场景验证、测试用例覆盖 |
 | [`verify-backend-sop-db`](#verify-backend-sop-db) | 通过真实后端入口和真实数据库验证业务操作规则 | 数据库集成测试、业务规则验收、持久化结果验证 |
 
 ### `build-scenario-validation-loop`
@@ -67,6 +68,22 @@ git add <文件路径>
 
 ```text
 使用 git-commit，提交当前暂存区中的改动。
+```
+
+### `sop-verify`
+
+在 Git 仓库中从业务 SOP 形成可核对的场景与执行记录。对话流程见[技能入口](sop-verify/SKILL.md)，文件和命令细节由入口链接到参考文档。
+
+示例：
+
+```text
+使用 sop-verify 验证 docs/退款SOP.md，并核对测试同事提供的用例覆盖。
+```
+
+按需安装：
+
+```bash
+npx skills add https://github.com/AdolphKevin/praxis-skills --skill sop-verify
 ```
 
 ### `verify-backend-sop-db`

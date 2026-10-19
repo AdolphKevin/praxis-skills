@@ -1,0 +1,4 @@
+interface:
+  display_name: "SOP 业务场景验证"
+  short_description: "从业务 SOP 编写正反向场景，保存独立执行证据并生成本机验收报告"
+  default_prompt: "使用 $sop-verify 验证当前项目的业务 SOP，确认场景预期后独立执行并报告结果。"
