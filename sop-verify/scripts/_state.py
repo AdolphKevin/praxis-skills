@@ -183,6 +183,12 @@ class State:
                 raise Invalid('batch-conflict', [problem(
                     f'批次 {self.batch} 已属于 {record.get("scenario_file")}，不能用于 {self.scenario_file}')])
 
+    def bind(self):
+        """Board mode retains only the local batch-to-path binding."""
+        if not (self.directory / 'batch.json').exists():
+            with self.staging() as staged:
+                self.publish(staged, [])
+
     def writable(self):
         try:
             resolved = self.base.resolve()

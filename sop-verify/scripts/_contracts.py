@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from _yaml import loads
+from _yaml import Mapping, loads
 
 
 class Invalid(Exception):
@@ -86,7 +86,11 @@ class JsonValidator(Validator):
         self.problems.append(problem(f'{location or "$"}：{message}'))
 
 
-ENTRY_FIELDS = {'surface', 'operate', 'observe', 'evidence', 'isolation', 'address_env'}
+ENTRY_REQUIRED = {'surface', 'operate', 'observe', 'evidence', 'isolation'}
+ENTRY_FIELDS = ENTRY_REQUIRED | {'address_env', 'candidate', 'start', 'reload'}
+CHECK_FIELDS = {'argv', 'cwd', 'timeout', 'format', 'report', 'required_env'}
+CHECK_METADATA = {'purpose', 'required_cases', 'environment', 'coverage', 'artifacts',
+                  'review', 'repository', 'revision_sensitive'}
 NEGATIVE_TYPES = set('empty-input over-length not-found permission cross-tenant duplicate '
                      'concurrency disconnect timeout archived invalid-input incomplete-input '
                      'interrupted stale-input tampered-input other'.split())
@@ -94,7 +98,7 @@ NEGATIVE_TYPES = set('empty-input over-length not-found permission cross-tenant 
 
 def validate_entries(document):
     v = Validator()
-    if v.fields(document, {'entries'}, set(), '入口声明'):
+    if v.fields(document, {'entries'}, {'checks'}, '入口声明'):
         entries = document.get('entries')
         if not isinstance(entries, dict) or not entries:
             v.add(document, 'entries', 'entries 必须是非空对象')
@@ -102,7 +106,10 @@ def validate_entries(document):
             for name, entry in entries.items():
                 if not text(name):
                     v.add(entries, name, '入口名必须是非空字符串')
-                if v.fields(entry, ENTRY_FIELDS - {'address_env'}, {'address_env'}, str(name)):
+                if not isinstance(entry, dict):
+                    v.add(entries, name, f'{name} 必须是对象')
+                    continue
+                if v.fields(entry, ENTRY_REQUIRED, ENTRY_FIELDS - ENTRY_REQUIRED, str(name)):
                     v.texts(entry, ['surface', 'operate', 'isolation'], str(name))
                     v.arrays(entry, ['observe', 'evidence'], str(name))
                     if 'address_env' in entry:
@@ -110,8 +117,49 @@ def validate_entries(document):
                         if not isinstance(entry['address_env'], str) or not re.fullmatch(
                                 r'[A-Za-z_][A-Za-z0-9_]*', entry['address_env']):
                             v.add(entry, 'address_env', f'{name} 的 address_env 必须是环境变量名')
+                    if 'candidate' in entry and entry['candidate'] not in ('checkout', 'start', 'in-place'):
+                        v.add(entry, 'candidate', f'{name} 的 candidate 必须是 checkout、start 或 in-place')
+                    if entry.get('candidate') == 'start' and 'address_env' not in entry:
+                        v.add(entry, 'candidate', f'{name} 的 candidate 为 start 时必须填写 address_env')
+                    for key in ('start', 'reload'):
+                        if key in entry or (key == 'start' and entry.get('candidate') == 'start'):
+                            v.arrays(entry, [key], str(name))
+        checks = document.get('checks', {})
+        if not isinstance(checks, dict):
+            v.add(document, 'checks', 'checks 必须是对象')
+        else:
+            for name, check in checks.items():
+                if not text(name):
+                    v.add(checks, name, '检查编号必须是非空字符串')
+                if not isinstance(check, dict):
+                    v.add(checks, name, f'{name} 必须是对象')
+                    continue
+                if not v.fields(check, {'argv', 'timeout', 'format'},
+                                (CHECK_FIELDS | CHECK_METADATA) - {'argv', 'timeout', 'format'}, str(name)):
+                    continue
+                v.arrays(check, ['argv'], str(name))
+                if not isinstance(check.get('cwd', '.'), str):
+                    v.add(check, 'cwd', f'{name} 的 cwd 必须是字符串')
+                if type(check.get('timeout')) is not int or check['timeout'] <= 0:
+                    v.add(check, 'timeout', f'{name} 的 timeout 必须是正整数')
+                if check.get('format') not in ('junit', 'go-json'):
+                    v.add(check, 'format', f'{name} 的 format 必须是 junit 或 go-json')
+                if 'report' in check or check.get('format') == 'junit':
+                    v.texts(check, ['report'], str(name))
+                if 'required_env' in check:
+                    v.arrays(check, ['required_env'], str(name), False)
     v.finish('entries-invalid')
     return document['entries']
+
+
+def select_fields(value, fields):
+    """Keep source positions when selecting the supported fields from tw JSON."""
+    if not isinstance(value, dict):
+        return value
+    selected = Mapping(line_of(value))
+    selected.update((key, val) for key, val in value.items() if key in fields)
+    selected.lines = {key: line_of(value, key) for key in selected}
+    return selected
 
 
 def resolve_entries(root, scenario, explicit=None):
@@ -131,24 +179,35 @@ def resolve_entries(root, scenario, explicit=None):
     warnings = []
     if selected == config:
         raw = doc.get('acceptance_entries', {}) if isinstance(doc, dict) else {}
-        doc = {'entries': {name: {k: val for k, val in entry.items() if k in ENTRY_FIELDS}
-                           if isinstance(entry, dict) else entry
-                           for name, entry in raw.items()}} if isinstance(raw, dict) else {}
+        checks = doc.get('checks', {}) if isinstance(doc, dict) else {}
+        selected_entries = select_fields(raw, raw) if isinstance(raw, dict) else raw
+        if isinstance(selected_entries, dict):
+            for name in selected_entries:
+                selected_entries[name] = select_fields(selected_entries[name], ENTRY_FIELDS)
+        selected_doc = Mapping(line_of(doc))
+        selected_doc.update(entries=selected_entries, checks=checks)
+        selected_doc.lines = {'entries': line_of(doc, 'acceptance_entries'), 'checks': line_of(doc, 'checks')}
+        doc = selected_doc
     entries = validate_entries(doc)
     if selected == sibling and config.exists():
         try:
-            other = json.loads(config.read_text(encoding='utf-8')).get('acceptance_entries', {})
+            other_doc = json.loads(config.read_text(encoding='utf-8'))
+            other = other_doc.get('acceptance_entries', {})
             for name, entry in entries.items():
                 if name in other and isinstance(other[name], dict):
                     comparable = {k: val for k, val in other[name].items() if k in ENTRY_FIELDS}
                     if entry != comparable:
                         warnings.append(f'{name} 入口在 entries.yaml 与 .tw/config.json 中内容不同')
+            other_checks = other_doc.get('checks', {})
+            for name, check in doc.get('checks', {}).items():
+                if name in other_checks and check != other_checks[name]:
+                    warnings.append(f'{name} 检查在 entries.yaml 与 .tw/config.json 中内容不同')
         except (OSError, UnicodeError, ValueError, AttributeError):
             warnings.append('.tw/config.json 无法读取，已使用 entries.yaml')
-    return entries, selected.resolve(), warnings
+    return doc, selected.resolve(), warnings
 
 
-def validate_scenarios(doc, entries):
+def validate_scenarios(doc, entries, checks=None):
     v = Validator()
     if not v.fields(doc, {'metadata', 'sops'}, set(), '场景文件'):
         v.finish('scenario-file-invalid')
@@ -229,6 +288,8 @@ def validate_scenarios(doc, entries):
                 elif set(reg) == {'check', 'cases'}:
                     v.texts(reg, ['check'], label_s)
                     v.arrays(reg, ['cases'], label_s)
+                    if text(reg.get('check')) and reg['check'] not in (checks or {}):
+                        v.add(reg, 'check', f'{label_s} regression.check 引用未声明检查 {reg["check"]}')
                 elif set(reg) == {'manual', 'owner', 'trigger'}:
                     v.texts(reg, ['manual', 'owner', 'trigger'], label_s)
                 elif set(reg) == {'pending'}:
@@ -240,11 +301,11 @@ def validate_scenarios(doc, entries):
     return scenarios
 
 
-def load_results(path, scenario_ids):
+def load_results(path, scenario_ids, raw=None):
     from datetime import datetime, timezone
     v = Validator()
     try:
-        lines = path.read_text(encoding='utf-8').splitlines()
+        lines = (path.read_text(encoding='utf-8') if raw is None else raw.decode('utf-8')).splitlines()
     except (OSError, UnicodeError) as error:
         raise Invalid('scenario-results-invalid', [problem(str(error))]) from error
     if not any(line.strip() for line in lines):

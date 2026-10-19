@@ -59,6 +59,8 @@ class SopTests(unittest.TestCase):
         self.env = dict(os.environ, XDG_STATE_HOME=str(self.state),
                         PYTHONDONTWRITEBYTECODE='1')
         self.env.pop('SOP_VERIFY_STATE', None)
+        for name in ('SOP_BOARD_URL', 'SOP_BOARD_PROJECT', 'SOP_BOARD_TOKEN'):
+            self.env.pop(name, None)
         self.doc = example()
         self.scenario = self.repo / 'docs/sop/demo.yaml'
         self.scenario.parent.mkdir(parents=True)
@@ -368,6 +370,8 @@ sops:
     def test_pending_changed_failed_blocked_and_product_changes(self):
         """I1/D2; SOP-02-P01/P02/N01/N02: current-content history."""
         self.doc['sops'][0]['scenarios'][0]['regression'] = dict(check='unit', cases=['Demo::test_a'])
+        self.write_json(self.entries, dict(entries={'cli': self.entry}, checks={
+            'unit': dict(argv=['python3', '-m', 'unittest'], timeout=60, format='go-json')}))
         self.save()
         self.run_cli('submit', self.scenario, '--results', self.results_file())
         self.assertEqual([], self.run_cli('pending', self.scenario, readonly=True)['pending'])
@@ -938,6 +942,8 @@ test_cases:
     def test_report_first_current_fingerprint_and_unverified_scope(self):
         """D2: first blocked/skip excluded; report current-content history."""
         self.doc['sops'][0]['scenarios'][0]['regression'] = dict(check='unit', cases=['Demo::test_a'])
+        self.write_json(self.entries, dict(entries={'cli': self.entry}, checks={
+            'unit': dict(argv=['python3', '-m', 'unittest'], timeout=60, format='go-json')}))
         self.doc['sops'][0]['scenarios'][1]['regression'] = dict(pending='Q-AUTO')
         self.save()
         path = self.results_file({'N1-P': 'blocked', 'N1-N': 'skip', 'N2-P': 'pass', 'N2-N': 'fail'})
