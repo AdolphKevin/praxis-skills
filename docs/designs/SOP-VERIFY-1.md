@@ -8,6 +8,8 @@ roles: {"design_owner":"Claude","implementation_owner":"Codex","acceptance_owner
 
 # SOP-VERIFY-1：sop-verify 本机模式
 
+已退役（2026-10-23）：sop-verify 并入 Flow Board，见 [README](../../README.md#已退役sop-verify)。
+
 > 本文件是 tw 任务 SOP-VERIFY-1 的方案原文。总体设计与决定见 team-workflow 仓库的 `docs/proposals/2026-10-19-standalone-sop-verification.md`（v7），本需求对应其第 8 节第一行。验收场景见 [docs/sop/sop-verify.yaml](../sop/sop-verify.yaml)。
 >
 > 状态：修订 2。修订 1 由 AdolphKevin 于 2026-10-19 批准；修订 2 新增错误代码 `state-invalid`，AdolphKevin 同日批准。

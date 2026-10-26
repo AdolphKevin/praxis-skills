@@ -1,3 +1,4 @@
+# 已退役（2026-10-23）：sop-verify 并入 Flow Board，见 README。
 # SOP-VERIFY-1：sop-verify 本机模式的验收场景
 # 预期只依据 team-workflow 仓库的 SOP 验证独立化方案 v7 与 docs/designs/SOP-VERIFY-1.md 的 I1、D1、D2 与任务 T2，不依据当前实现的输出。
 # 版本 1（2026-10-19）：Claude 依据上述两份原文编写，AdolphKevin 2026-10-19 确认。

@@ -1,11 +1,13 @@
 ---
 title: "SOP 只写“给出提示”时，场景预期要先问清提示内容"
-scope: ["self:sop-verify/SKILL.md", "self:sop-verify/references/**"]
+scope: ["self:docs/designs/SOP-VERIFY-1.md", "self:docs/sop/sop-verify.yaml"]
 source: ["self:docs/sop/sop-verify.yaml#SOP-06-P01", "self:docs/designs/SOP-VERIFY-1.md"]
 verified: {"self": {"commit": "39daefaa082fd315e2d0dd200a2c513b50d926d0", "date": "2026-10-19"}}
 tags: ["sop-verify", "待确认", "预期", "提示文字", "场景编写", "技能"]
 ---
 # SOP 只写“给出提示”时，场景预期要先问清提示内容
+
+已退役（2026-10-23）：sop-verify 并入 Flow Board，见 [README](../../README.md#已退役sop-verify)。
 
 现象：第 1 轮独立验收中，被测会话把 SOP 原句“拒绝退款并给出提示”直接写进反向场景的 expected，没有把提示内容作为待确认问题提出；执行时任何提示都能判为通过，场景 SOP-06-P01 失败。
 

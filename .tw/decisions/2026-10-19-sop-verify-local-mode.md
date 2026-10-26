@@ -1,11 +1,13 @@
 ---
 title: "sop-verify 在仓库外保存轮次，格式与 team-workflow 同义、各自实现"
-scope: ["self:sop-verify/**"]
+scope: ["self:docs/designs/SOP-VERIFY-1.md", "self:docs/sop/sop-verify.yaml"]
 source: ["self:docs/designs/SOP-VERIFY-1.md", "AdolphKevin/team-workflow:docs/proposals/2026-10-19-standalone-sop-verification.md"]
 status: "accepted"
 tags: ["sop-verify", "SOP 验证", "场景验收", "本机状态", "错误代码", "独立执行", "会话标识"]
 ---
 # sop-verify 在仓库外保存轮次，格式与 team-workflow 同义、各自实现
+
+已退役（2026-10-23）：sop-verify 并入 Flow Board，见 [README](../../README.md#已退役sop-verify)。
 
 使用者不接入 tw 也能验证业务 SOP：业务仓库只保存 `docs/sop/` 下的场景文件与入口声明；轮次、证据副本、用例并集与配对快照保存在仓库外的状态目录（`SOP_VERIFY_STATE`，缺省 `${XDG_STATE_HOME:-~/.local/state}/sop-verify`），按检出目录分开。所有子命令都不在业务仓库内写文件。
 
