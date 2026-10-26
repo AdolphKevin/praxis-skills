@@ -31,10 +31,13 @@ If nothing is staged, stop and tell the user to stage files first.
 - **Change type**: Infer from file paths and diff content:
   - `docs/*.md`, `*.md` changes → `Docs`
   - `cmd/`, `internal/`, `pkg/` with new functionality → `Feature`
-  - `fix`, `bug`, `hotfix` in messages → `Bugfix` or `Critical-Fix`
+  - `fix`, `bug`, `hotfix` in messages → `Bugfix`, the full word for every fix; `Critical-Fix` for security or data-loss fixes
   - `refactor`, `rename`, `extract` → `Refactor`
   - `perf`, `optimize`, `faster` → `Perf`
+  - CI, build, dependency or tooling files (`.github/workflows/`, `Makefile`, `Dockerfile`, `go.mod`/`go.sum`, lockfiles, lint or formatter config), or formatting-only changes → `Chore`
   - Default to `Feature` if ambiguous
+
+  Type the commit by its primary change: docs or tests edited to follow that change keep the primary change's type.
 
 - **Scope**: Infer from the most relevant directory, package, module, or feature area. Keep it short and lowercase.
 
@@ -86,7 +89,8 @@ Amend only the commit created in this run, never a commit that has already been 
 |------|-------------|
 | `Feature` | New feature or functionality |
 | `Bugfix` | Bug fix |
-| `Refactor` | Code refactoring without changing behavior |
+| `Refactor` | Restructure source code without changing behavior |
 | `Critical-Fix` | Critical/security bug fix |
 | `Docs` | Documentation changes |
 | `Perf` | Performance improvements |
+| `Chore` | Maintenance outside product behavior: CI, build, dependencies, tooling, formatting |
