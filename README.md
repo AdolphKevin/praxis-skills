@@ -10,6 +10,7 @@ Praxis Skills 收录从真实软件项目中沉淀的可复用工程 Skill。每
 | --- | --- | --- |
 | [`build-scenario-validation-loop`](#build-scenario-validation-loop) | 为人工智能服务建立基于场景、证据和独立审核的质量验证闭环 | 智能代理、带状态的人工智能服务、方案对比评测 |
 | [`business-flow-mapper`](#business-flow-mapper) | 从代码和文档中还原业务处理流程，生成中文 Mermaid 流程图 | 梳理业务链路、解释系统行为、定位流程分支 |
+| [`codex-collab`](#codex-collab) | 在当前 Claude Code 对话中手动启用 Claude 与 Codex 的分工协作 | 把实现、批量整理和大范围调查交给 Codex，由 Claude 交接和审核 |
 | [`git-commit`](#git-commit) | 根据暂存区中的实际改动生成规范提交 | 整理提交说明、评估改动风险、创建 Git 提交 |
 | [`verify-backend-sop-db`](#verify-backend-sop-db) | 通过真实后端入口和真实数据库验证业务操作规则 | 数据库集成测试、业务规则验收、持久化结果验证 |
 
@@ -49,6 +50,26 @@ Praxis Skills 收录从真实软件项目中沉淀的可复用工程 Skill。每
 
 ```text
 使用 business-flow-mapper，梳理退款申请从收到请求到退款完成的业务流程。
+```
+
+### `codex-collab`
+
+在 Claude Code 对话中手动启用 Claude 与 Codex 的分工协作。Claude 负责需求澄清、方案取舍、任务交接、审核和收尾；方向明确后的代码实现、缺陷修复、批量文档整理、大范围调查和第二意见交给 Codex。
+
+这个 Skill 只能由使用者手动调用，不会被自动触发。启用后一直有效，直到对话结束或使用者说明退出。它依赖 Claude Code 中已安装的 OpenAI Codex 插件和本机的 `codex` 命令行工具，只适用于 Claude Code。
+
+它规定了：
+
+- Claude、Codex、Explore 子代理和使用者各自承担的工作；
+- 交接说明必须写明的目标、范围、已确认取舍和完成依据；
+- 通过插件或 `codex exec` 启动和续接 Codex 任务的方式；
+- 多个任务修改同一文件时的合并方式；
+- 审核 Codex 产物时要排查的越界、答非所问、过度设计、坏取舍和冒充完成。
+
+示例：
+
+```text
+/codex-collab 修复订单导出缺少退款金额的问题
 ```
 
 ### `git-commit`

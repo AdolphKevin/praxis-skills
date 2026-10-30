@@ -11,6 +11,7 @@ source: ["README.md"]
 | `build-scenario-validation-loop` | 为智能代理与有状态 AI 服务建立场景、证据与独立审核的验证闭环；`scripts/` 提供证据哈希与审核绑定核对 |
 | `verify-backend-sop-db` | 经真实后端入口与真实数据库验证业务 SOP；`scripts/run_postgres_test.sh` 启动隔离的 PostgreSQL |
 | `business-flow-mapper` | 从代码与文档还原业务流程，输出中文 Mermaid 流程图 |
+| `codex-collab` | 在 Claude Code 对话中手动启用 Claude 与 Codex 分工协作；只限 Claude Code，无 `agents/openai.yaml` |
 | `git-commit` | 依据暂存区改动生成规范提交 |
 
 技能随安装复制整个目录，`agents/openai.yaml` 是 Codex 的入口描述。技能附带的脚本只用 Python 标准库或系统自带命令，使用者安装后即可运行；测试用 `unittest` 编写，通过 `.tw/config.json` 登记的检查运行。
